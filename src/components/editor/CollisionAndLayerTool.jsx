@@ -3,11 +3,12 @@
  * y la Grilla de Caminata (NavMesh A*) de cada negocio en 3D.
  */
 
-import React from 'react';
-import { ShieldAlert, Grid, Eye, PlusCircle, Trash2, RotateCcw, X } from 'lucide-react';
+import React, { useState } from 'react';
+import { ShieldAlert, Grid, Eye, PlusCircle, Trash2, RotateCcw, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { useSceneEditorStore } from '../../store/useSceneEditorStore.js';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { NEGOCIOS_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
+import GeniePanel from '../ui/GeniePanel.jsx';
 
 export default function CollisionAndLayerTool() {
   const isOpen = useSceneEditorStore((s) => s.isCollisionToolOpen);
@@ -26,6 +27,7 @@ export default function CollisionAndLayerTool() {
 
   const focusedNegocioId = useGameStore((s) => s.focusedNegocioId);
   const setFocusedNegocioId = useGameStore((s) => s.setFocusedNegocioId);
+  const [isMinimized, setIsMinimized] = useState(false);
 
   if (!isOpen) return null;
 
@@ -33,24 +35,49 @@ export default function CollisionAndLayerTool() {
   const blocks = collisionBlocksByNegocio[activeNegId] || [];
 
   return (
-    <div className="fixed top-20 right-4 z-40 w-80 bg-slate-900/95 border border-slate-700 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden flex flex-col max-h-[75vh]">
-      <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <ShieldAlert className="w-4 h-4 text-rose-400" />
-          <h3 className="text-xs font-bold uppercase tracking-wider text-white">
-            Pisos, Muros y Colisiones 3D
-          </h3>
-        </div>
-        <button
-          onClick={() => {
-            setEditorTool('VIEW');
-            setOpen(false);
-          }}
-          className="text-slate-400 hover:text-white"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
+    <div className="fixed top-24 right-4 z-40">
+      <GeniePanel
+        isMinimized={isMinimized}
+        origin="top right"
+        direction="top"
+        renderDockIcon={() => (
+          <button
+            onClick={() => setIsMinimized(false)}
+            className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-900/95 hover:bg-slate-800 border border-rose-500/50 text-rose-300 text-xs font-bold shadow-xl backdrop-blur-md"
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>Colisiones 3D</span>
+            <ChevronDown className="w-3.5 h-3.5" />
+          </button>
+        )}
+      >
+        <div className="w-80 bg-slate-900/95 border border-slate-700 rounded-2xl shadow-2xl backdrop-blur-md overflow-hidden flex flex-col max-h-[75vh]">
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-950 border-b border-slate-800">
+            <div className="flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-400" />
+              <h3 className="text-xs font-bold uppercase tracking-wider text-white">
+                Pisos, Muros y Colisiones 3D
+              </h3>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setIsMinimized(true)}
+                className="p-1 text-slate-400 hover:text-white"
+                title="Minimizar"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => {
+                  setEditorTool('VIEW');
+                  setOpen(false);
+                }}
+                className="p-1 text-slate-400 hover:text-white"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
       <div className="p-3.5 space-y-3 overflow-y-auto text-xs">
         {/* Selector de Local */}
@@ -181,7 +208,9 @@ export default function CollisionAndLayerTool() {
             ))}
           </div>
         </div>
-      </div>
+        </div>
+        </div>
+      </GeniePanel>
     </div>
   );
 }

@@ -26,3 +26,163 @@
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(20, 184, 166, 0.8);
 }
+
+/* ============================================================
+ * Animación tipo Mac Dock "Genie" (Encoge y estira hacia el icono)
+ * ============================================================ */
+@keyframes macGenieMinimizeDown {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1) skewX(0deg);
+    filter: blur(0px);
+  }
+  35% {
+    opacity: 0.92;
+    transform: translate3d(0, 10px, 0) scale(0.74, 1.12) skewX(-5deg);
+    filter: blur(0px);
+  }
+  75% {
+    opacity: 0.55;
+    transform: translate3d(0, 26px, 0) scale(0.28, 0.55) skewX(7deg);
+    filter: blur(0.6px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 38px, 0) scale(0.05, 0.04) skewX(10deg);
+    filter: blur(1px);
+  }
+}
+
+@keyframes macGenieMaximizeUp {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 38px, 0) scale(0.05, 0.04) skewX(10deg);
+    filter: blur(1px);
+  }
+  45% {
+    opacity: 0.92;
+    transform: translate3d(0, 10px, 0) scale(0.72, 1.1) skewX(-4deg);
+    filter: blur(0px);
+  }
+  80% {
+    opacity: 1;
+    transform: translate3d(0, -2px, 0) scale(1.02, 0.98) skewX(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1) skewX(0deg);
+  }
+}
+
+@keyframes macGenieMinimizeTop {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1) skewX(0deg);
+  }
+  38% {
+    opacity: 0.9;
+    transform: translate3d(-12px, -4px, 0) scale(0.68, 1.14) skewX(6deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(-28px, -10px, 0) scale(0.04, 0.06) skewX(-10deg);
+  }
+}
+
+@keyframes macGenieMaximizeTop {
+  0% {
+    opacity: 0;
+    transform: translate3d(-28px, -10px, 0) scale(0.04, 0.06) skewX(-10deg);
+  }
+  50% {
+    opacity: 0.94;
+    transform: translate3d(-8px, 2px, 0) scale(0.78, 1.08) skewX(4deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1, 1) skewX(0deg);
+  }
+}
+
+@keyframes macDockPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  65% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.genie-enter-bottom {
+  animation: macGenieMaximizeUp 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.genie-exit-bottom {
+  animation: macGenieMinimizeDown 340ms cubic-bezier(0.55, 0, 0.75, 0.45) forwards;
+}
+.genie-enter-top {
+  animation: macGenieMaximizeTop 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.genie-exit-top {
+  animation: macGenieMinimizeTop 340ms cubic-bezier(0.55, 0, 0.75, 0.45) forwards;
+}
+.genie-dock-pop {
+  animation: macDockPopIn 280ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* ============================================================
+ * Animación tipo StarCraft SCV (Texto +$50 arriba de caja)
+ * ============================================================ */
+@keyframes starcraftScvCash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, 4px) scale(0.75);
+  }
+  15% {
+    opacity: 1;
+    transform: translate(-50%, -10px) scale(1.15);
+  }
+  40% {
+    opacity: 1;
+    transform: translate(-50%, -26px) scale(1.0);
+  }
+  75% {
+    opacity: 0.95;
+    transform: translate(-50%, -44px) scale(0.98);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -62px) scale(0.92);
+  }
+}
+
+.animate-scv-cash {
+  animation: starcraftScvCash 1.9s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ============================================================
+ * Animación radial de botones en arco (Vista General)
+ * ============================================================ */
+@keyframes arcButtonPop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.2);
+  }
+  70% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--arc-x)), calc(-50% + var(--arc-y))) scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--arc-x)), calc(-50% + var(--arc-y))) scale(1);
+  }
+}
+
+.arc-btn-pop {
+  animation: arcButtonPop 340ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}

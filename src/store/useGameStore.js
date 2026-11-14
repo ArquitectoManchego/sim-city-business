@@ -113,7 +113,10 @@ function buildInitialStatsPorNegocio() {
       nombre: NEGOCIOS_ZONES_3D[negId].nombre,
       ingresosHoy: 0,
       ingresosTotales: 0,
+      costoInsumosHoy: 0,
       costoInsumosTotales: 0,
+      kwhHoy: 0,
+      kwhMes: 0,
       kwhAcumulados: 0,
       ventasHoy: 0,
       ventasTotales: 0,
@@ -169,8 +172,10 @@ export const useGameStore = create((set, get) => ({
   simTimeMs: new Date(2026, 4, 15, 10, 15, 0).getTime(),
   diasSimuladosCount: 1,
   ultimoDiaRegistrado: 15,
+  ultimoMesRegistrado: 4,
   timeScale: 1, // 0=Pausa, 1=Tiempo Real (1s=1s), 10=10x, 60=1min/s, 600=1h en 6s
   escenarioGlobal: 'medio', // 'bajo' | 'tablas' | 'medio' | 'alto' | 'muy_alto'
+  cashPopups: [], // Popups flotantes StarCraft +$50 arriba de la caja TPV
 
   // Cámara y foco de vista 3D
   focusedNegocioId: 'hawaiian_paradise', // 'ALL_CONSORCIO' | negocioId | 'CFE_METER_INSPECT'
@@ -514,6 +519,9 @@ export const useGameStore = create((set, get) => ({
     let nextHistorial = state.historialDiario;
     let nextDiasCount = state.diasSimuladosCount;
     let nextUltimoDia = state.ultimoDiaRegistrado;
+    let nextUltimoMes = state.ultimoMesRegistrado ?? simDate.getMonth();
+    const realNowMs = Date.now();
+    let nextCashPopups = (state.cashPopups || []).filter((p) => realNowMs - p.createdAtMs < 2100);
 
     const pushLog = (negocioId, tipo, mensaje) => {
       nextLogs = [
@@ -529,9 +537,11 @@ export const useGameStore = create((set, get) => ({
       ];
     };
 
-    // Cambio de día calendario -> guardar corte diario en historialDiario y reiniciar ingresosHoy
+    // Cambio de día calendario -> guardar corte diario en historialDiario y reiniciar contadores diarios
     if (simDate.getDate() !== state.ultimoDiaRegistrado) {
+      const esNuevoMes = simDate.getMonth() !== nextUltimoMes;
       nextUltimoDia = simDate.getDate();
+      nextUltimoMes = simDate.getMonth();
       nextDiasCount += 1;
       const resumenDia = {
         fecha: formatDateShort(new Date(state.simTimeMs)),
@@ -547,6 +557,9 @@ export const useGameStore = create((set, get) => ({
         nextStats[nId] = {
           ...nextStats[nId],
           ingresosHoy: 0,
+          costoInsumosHoy: 0,
+          kwhHoy: 0,
+          kwhMes: esNuevoMes ? 0 : (nextStats[nId].kwhMes || 0),
           ventasHoy: 0
         };
       });
@@ -748,6 +761,24 @@ export const useGameStore = create((set, get) => ({
                 }
               }
 
+              // Detectar si el sub-paso que acaba de concluir es el pago en caja TPV
+              const esPasoPago =
+                paso.waypointCliente === 'caja_tpv_cliente' ||
+                paso.waypointVendedor === 'caja_tpv_vendedor' ||
+                (paso.codigo || '').includes('PAY') ||
+                (paso.codigo || '').includes('CHECKOUT');
+
+              if (esPasoPago && !clienteActivo.pagoEmitido) {
+                const montoPago = parseFloat(clienteActivo.productoDeseado?.precioVenta) || 45;
+                clienteActivo.pagoEmitido = true;
+                nextCashPopups.push({
+                  id: `cash_${realNowMs}_${Math.random().toString(36).slice(2, 7)}`,
+                  negocioId: negId,
+                  monto: montoPago,
+                  createdAtMs: realNowMs
+                });
+              }
+
               // Pasar al siguiente sub-paso o concluir la venta/atención
               if (emp.pasoActualIndex + 1 < pasos.length) {
                 emp.pasoActualIndex += 1;
@@ -785,10 +816,21 @@ export const useGameStore = create((set, get) => ({
                 const st = nextStats[negId];
                 const prevCount = st.productosVendidosCount[prodVendido.id] || 0;
 
+                if (!clienteActivo.pagoEmitido) {
+                  clienteActivo.pagoEmitido = true;
+                  nextCashPopups.push({
+                    id: `cash_${realNowMs}_${Math.random().toString(36).slice(2, 7)}`,
+                    negocioId: negId,
+                    monto: precio,
+                    createdAtMs: realNowMs
+                  });
+                }
+
                 nextStats[negId] = {
                   ...st,
                   ingresosHoy: st.ingresosHoy + precio,
                   ingresosTotales: st.ingresosTotales + precio,
+                  costoInsumosHoy: (st.costoInsumosHoy || 0) + costoMat,
                   costoInsumosTotales: st.costoInsumosTotales + costoMat,
                   ventasHoy: st.ventasHoy + 1,
                   ventasTotales: st.ventasTotales + 1,
@@ -892,6 +934,8 @@ export const useGameStore = create((set, get) => ({
         if (nextStats[eq.negocioId]) {
           nextStats[eq.negocioId] = {
             ...nextStats[eq.negocioId],
+            kwhHoy: (nextStats[eq.negocioId].kwhHoy || 0) + deltaKwh,
+            kwhMes: (nextStats[eq.negocioId].kwhMes || 0) + deltaKwh,
             kwhAcumulados: nextStats[eq.negocioId].kwhAcumulados + deltaKwh
           };
         }
@@ -902,6 +946,8 @@ export const useGameStore = create((set, get) => ({
       simTimeMs: nextSimTimeMs,
       diasSimuladosCount: nextDiasCount,
       ultimoDiaRegistrado: nextUltimoDia,
+      ultimoMesRegistrado: nextUltimoMes,
+      cashPopups: nextCashPopups,
       empleadosPorNegocio: nextEmpleados,
       clientesColaPorNegocio: nextColas,
       clientesPostCompraPorNegocio: nextPostCompra,
@@ -941,10 +987,17 @@ export const useGameStore = create((set, get) => ({
       let totalIngresosSalto = 0;
       let totalVentasSalto = 0;
       let totalKwhSalto = 0;
+      let trackedMonth = new Date(cursorMs).getMonth();
 
       for (let h = 0; h < horasASimular; h++) {
         cursorMs += 3600 * 1000;
         const curDate = new Date(cursorMs);
+        if (curDate.getMonth() !== trackedMonth) {
+          trackedMonth = curDate.getMonth();
+          NEGOCIOS_ACTIVOS_IDS.forEach((nId) => {
+            nextStats[nId].kwhMes = 0;
+          });
+        }
         const cond = evaluarCondicionesDemanda(curDate, state.campanasActivas, state.escenarioGlobal);
 
         // Integrar consumo eléctrico base de refrigeradores/CCTV/luces/clima en esta hora
@@ -967,6 +1020,8 @@ export const useGameStore = create((set, get) => ({
             eq.kwhAcumulados += kwhH;
             totalKwhSalto += kwhH;
             if (nextStats[eq.negocioId]) {
+              nextStats[eq.negocioId].kwhHoy = (nextStats[eq.negocioId].kwhHoy || 0) + kwhH;
+              nextStats[eq.negocioId].kwhMes = (nextStats[eq.negocioId].kwhMes || 0) + kwhH;
               nextStats[eq.negocioId].kwhAcumulados += kwhH;
             }
           }
@@ -976,7 +1031,6 @@ export const useGameStore = create((set, get) => ({
         if (cond.enHorarioOperativo) {
           NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
             const lambda = calcularTasaClientesPorHora(negId, cond, state.campanasActivas);
-            // Variación estocástica realista alrededor de lambda
             const numClientes = Math.max(0, Math.round(lambda * (0.75 + Math.random() * 0.5)));
 
             for (let c = 0; c < numClientes; c++) {
@@ -997,6 +1051,8 @@ export const useGameStore = create((set, get) => ({
                   const kwhPaso = (wattsEfectivos * (segs / 3600)) / 1000;
                   eq.segundosEncendidoTotal += segs;
                   eq.kwhAcumulados += kwhPaso;
+                  nextStats[negId].kwhHoy = (nextStats[negId].kwhHoy || 0) + kwhPaso;
+                  nextStats[negId].kwhMes = (nextStats[negId].kwhMes || 0) + kwhPaso;
                   nextStats[negId].kwhAcumulados += kwhPaso;
                   totalKwhSalto += kwhPaso;
                 }
@@ -1021,6 +1077,7 @@ export const useGameStore = create((set, get) => ({
               const costoMat = parseFloat(prod.costoMateriales) || 10;
               nextStats[negId].ingresosHoy += precio;
               nextStats[negId].ingresosTotales += precio;
+              nextStats[negId].costoInsumosHoy = (nextStats[negId].costoInsumosHoy || 0) + costoMat;
               nextStats[negId].costoInsumosTotales += costoMat;
               nextStats[negId].ventasHoy += 1;
               nextStats[negId].ventasTotales += 1;
@@ -1034,7 +1091,7 @@ export const useGameStore = create((set, get) => ({
           });
         }
 
-        // Al terminar cada día a las 23:00, registrar corte diario en el historial y en el Log
+        // Al terminar cada día a las 23:00, registrar corte diario en el historial y reiniciar contadores del día
         if (curDate.getHours() === 23) {
           nextDiasCount += 1;
           const resumenDia = {
@@ -1048,10 +1105,9 @@ export const useGameStore = create((set, get) => ({
               ventas: nextStats[nId].ventasHoy
             };
             sumaDia += nextStats[nId].ingresosHoy;
-            if (horasASimular <= 24 * 31 || curDate.getDate() === 1 || curDate.getDate() === 15) {
-              // Registrar línea de log diario si estamos simulando hasta 1 mes o en quincenas para 1 año
-            }
             nextStats[nId].ingresosHoy = 0;
+            nextStats[nId].costoInsumosHoy = 0;
+            nextStats[nId].kwhHoy = 0;
             nextStats[nId].ventasHoy = 0;
           });
           nextHistorial = [resumenDia, ...nextHistorial.slice(0, 365)];
@@ -1098,6 +1154,7 @@ export const useGameStore = create((set, get) => ({
         simTimeMs: cursorMs,
         diasSimuladosCount: nextDiasCount,
         ultimoDiaRegistrado: endDate.getDate(),
+        ultimoMesRegistrado: endDate.getMonth(),
         statsPorNegocio: nextStats,
         inventarioPorNegocio: nextInventario,
         equiposRuntime: nextEquipos,

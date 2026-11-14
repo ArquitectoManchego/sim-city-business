@@ -50,7 +50,7 @@ export default function CFEReceiptModal() {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
-      <div className="bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div style={{ transformOrigin: 'top right' }} className="genie-enter-top bg-slate-900 border border-emerald-500/40 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
         {/* Header estilo CFE */}
         <div className="flex items-center justify-between px-6 py-4 bg-emerald-950/90 border-b border-emerald-700/50">
           <div className="flex items-center gap-3">

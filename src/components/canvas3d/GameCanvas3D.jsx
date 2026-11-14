@@ -297,8 +297,19 @@ export default function GameCanvas3D() {
   const collisionGroupRef = useRef(null);
   const navMeshGroupRef = useRef(null);
   const customModelsGroupRef = useRef(null);
+  const cameraTransitionRef = useRef({
+    active: false,
+    startPos: new THREE.Vector3(),
+    startTarget: new THREE.Vector3(),
+    endPos: new THREE.Vector3(),
+    endTarget: new THREE.Vector3(),
+    progress: 0,
+    duration: 1.05
+  });
+  const hasMountedCameraRef = useRef(false);
 
   const [overlayLabels, setOverlayLabels] = useState([]);
+  const [overlayCashPopups, setOverlayCashPopups] = useState([]);
 
   const focusedNegocioId = useGameStore((s) => s.focusedNegocioId);
   const focusedMedidorId = useGameStore((s) => s.focusedMedidorId);
@@ -344,6 +355,9 @@ export default function GameCanvas3D() {
     controls.minDistance = 2.2;
     controls.maxDistance = 65;
     controls.target.set(-14, 0.8, -6);
+    controls.addEventListener('start', () => {
+      cameraTransitionRef.current.active = false;
+    });
     controlsRef.current = controls;
 
     // Iluminación Ambiental y Sol Direccional
@@ -807,6 +821,19 @@ export default function GameCanvas3D() {
         }
       });
 
+      // Interpolar transición suave de cámara si hay un cambio de negocio/vista en curso
+      const camTrans = cameraTransitionRef.current;
+      if (camTrans.active) {
+        camTrans.progress = Math.min(1, camTrans.progress + dt / camTrans.duration);
+        const t = camTrans.progress;
+        const eased = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        camera.position.lerpVectors(camTrans.startPos, camTrans.endPos, eased);
+        controls.target.lerpVectors(camTrans.startTarget, camTrans.endTarget, eased);
+        if (camTrans.progress >= 1) {
+          camTrans.active = false;
+        }
+      }
+
       controls.update();
       renderer.render(scene, camera);
 
@@ -884,7 +911,28 @@ export default function GameCanvas3D() {
           }
         });
 
+        // Proyectar popups de pago en caja (+$50 estilo StarCraft SCV)
+        const nextCash = [];
+        (freshGame.cashPopups || []).forEach((cp) => {
+          const zone = NEGOCIOS_ZONES_3D[cp.negocioId];
+          const wpMap = WAYPOINTS_POR_NEGOCIO[cp.negocioId];
+          if (!zone || !wpMap) return;
+          const wpCaja = wpMap.caja_tpv_vendedor || wpMap.barra_vendedor || [1.4, 0, -0.5];
+          const screenPos = projectToScreen(
+            new THREE.Vector3(zone.center[0] + wpCaja[0], 1.95, zone.center[2] + wpCaja[2] + 0.3)
+          );
+          if (screenPos) {
+            nextCash.push({
+              id: cp.id,
+              x: screenPos.x,
+              y: screenPos.y,
+              monto: cp.monto
+            });
+          }
+        });
+
         setOverlayLabels(nextLabels);
+        setOverlayCashPopups(nextCash);
       }
     };
 
@@ -985,33 +1033,54 @@ export default function GameCanvas3D() {
     });
   }, [customModels3D]);
 
-  // Mover suavemente la cámara cuando el usuario selecciona un negocio, vista general o el Medidor CFE
+  // Mover suavemente la cámara con animación interpolada cuando el usuario selecciona un negocio, vista general o el Medidor CFE
   useEffect(() => {
     const camera = cameraRef.current;
     const controls = controlsRef.current;
     if (!camera || !controls) return;
 
     const targetId = isTrainingMode ? trainingNegocioId : focusedNegocioId;
+    const endPos = new THREE.Vector3();
+    const endTarget = new THREE.Vector3();
 
     if (targetId === 'ALL_CONSORCIO') {
-      camera.position.set(0, 28, 28);
-      controls.target.set(0, 0, 1);
+      endPos.set(0, 28, 28);
+      endTarget.set(0, 0, 1);
     } else if (targetId === 'CFE_METER_INSPECT') {
       const mIdx = Math.max(0, (parseInt((focusedMedidorId || 'med_3').replace('med_', ''), 10) || 3) - 1);
       const zOff = 1 + (-2.2 + mIdx * 0.88);
-      camera.position.set(-19.5, 2.2, zOff + 0.8);
-      controls.target.set(-22.4, 1.65, zOff);
+      endPos.set(-19.5, 2.2, zOff + 0.8);
+      endTarget.set(-22.4, 1.65, zOff);
     } else if (NEGOCIOS_ZONES_3D[targetId]) {
       const zone = NEGOCIOS_ZONES_3D[targetId];
       if (isTrainingMode) {
-        camera.position.set(zone.center[0], 6.5, zone.center[2] + 6.5);
-        controls.target.set(zone.center[0], 1.0, zone.center[2] - 1.5);
+        endPos.set(zone.center[0], 6.5, zone.center[2] + 6.5);
+        endTarget.set(zone.center[0], 1.0, zone.center[2] - 1.5);
       } else {
-        camera.position.set(...zone.cameraPreset.position);
-        controls.target.set(...zone.cameraPreset.target);
+        endPos.set(...zone.cameraPreset.position);
+        endTarget.set(...zone.cameraPreset.target);
       }
+    } else {
+      return;
     }
-    controls.update();
+
+    if (!hasMountedCameraRef.current) {
+      hasMountedCameraRef.current = true;
+      camera.position.copy(endPos);
+      controls.target.copy(endTarget);
+      controls.update();
+      return;
+    }
+
+    cameraTransitionRef.current = {
+      active: true,
+      startPos: camera.position.clone(),
+      startTarget: controls.target.clone(),
+      endPos,
+      endTarget,
+      progress: 0,
+      duration: 1.05
+    };
   }, [focusedNegocioId, focusedMedidorId, isTrainingMode, trainingNegocioId]);
 
   return (
@@ -1019,7 +1088,7 @@ export default function GameCanvas3D() {
       {/* Lienzo WebGL 3D */}
       <div ref={mountRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
 
-      {/* Etiquetas Flotantes y Globos de Diálogo de Empleados y Clientes */}
+      {/* Etiquetas Flotantes, Globos de Diálogo y Popups +$50 estilo StarCraft SCV */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         {overlayLabels.map((lbl) => (
           <div
@@ -1053,6 +1122,21 @@ export default function GameCanvas3D() {
                 </div>
               )}
             </div>
+          </div>
+        ))}
+
+        {/* Popups flotantes puro texto verde +$XX arriba de la caja (estilo StarCraft SCV minerales) */}
+        {overlayCashPopups.map((cp) => (
+          <div
+            key={cp.id}
+            style={{
+              left: `${Math.round(cp.x)}px`,
+              top: `${Math.round(cp.y)}px`,
+              textShadow: '0 2px 3px rgba(0,0,0,0.98), 0 0 8px rgba(0,0,0,0.9)'
+            }}
+            className="animate-scv-cash absolute pointer-events-none select-none font-mono font-black text-xl text-[#22c55e] whitespace-nowrap bg-transparent border-0"
+          >
+            +${Number.isInteger(cp.monto) ? cp.monto : Math.round(cp.monto)}
           </div>
         ))}
       </div>

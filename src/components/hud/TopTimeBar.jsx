@@ -1,9 +1,10 @@
 /**
  * Barra Superior de Control del Tiempo, Velocidades (0x, 1x, 10x, 60x, 600x [1h=6s],
- * Saltos de Día/Semana/Mes/Año), Selector de Negocios, Medidor CFE y Accesos a Modos de Juego.
+ * Saltos de Día/Semana/Mes/Año), Selector Radial en Semicírculo dentro de "Vista General",
+ * Medidor CFE y Accesos a Modos de Juego.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pause,
   Play,
@@ -18,7 +19,8 @@ import {
   Box,
   ShieldAlert,
   Gauge,
-  Building2
+  Building2,
+  ChevronDown
 } from 'lucide-react';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { useTrainingStore } from '../../store/useTrainingStore.js';
@@ -50,6 +52,8 @@ export default function TopTimeBar() {
   const setCollisionToolOpen = useSceneEditorStore((s) => s.setCollisionToolOpen);
   const isCollisionToolOpen = useSceneEditorStore((s) => s.isCollisionToolOpen);
 
+  const [isVistaArcOpen, setIsVistaArcOpen] = useState(false);
+
   const simDate = new Date(simTimeMs);
   const cond = evaluarCondicionesDemanda(simDate, campanasActivas, escenarioGlobal);
 
@@ -72,8 +76,15 @@ export default function TopTimeBar() {
     { scale: 600, label: '600x (1h=6s)', icon: Zap }
   ];
 
+  const activeZone = NEGOCIOS_ZONES_3D[focusedNegocioId];
+
+  // Ángulos en grados para distribuir los 6 negocios en un semicírculo elegante debajo de "Vista General"
+  const arcAnglesDeg = [166, 136, 107, 73, 44, 14];
+  const radiusX = 248;
+  const radiusY = 178;
+
   return (
-    <header className="pointer-events-auto relative z-20 bg-slate-950/90 border-b border-slate-800/90 backdrop-blur-md px-3 py-2 flex flex-col gap-2 shadow-xl">
+    <header className="pointer-events-auto relative z-30 bg-slate-950/90 border-b border-slate-800/90 backdrop-blur-md px-3 py-2 flex flex-col gap-1.5 shadow-xl">
       {/* Fila 1: Reloj, Clima/Quincena, Controles de Velocidad y Saltos de Tiempo Macro */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         {/* Identidad, Reloj y Estado Ambiental */}
@@ -199,46 +210,15 @@ export default function TopTimeBar() {
         </div>
       </div>
 
-      {/* Fila 2: Navegación 3D por Local Comercial, Medidor CFE y Herramientas SketchUp / Stock */}
+      {/* Fila 2: Botón Vista General (con Menú Radial en Arco de 6 Negocios), Medidor CFE y Herramientas */}
       <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/70">
-        {/* Píldoras de Enfoque de Cámara a cada Negocio */}
-        <div className="flex flex-wrap items-center gap-1">
+        {/* Izquierda: Medidor CFE 3D */}
+        <div className="flex items-center gap-1.5">
           <button
-            onClick={() => setFocusedNegocioId('ALL_CONSORCIO')}
-            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition ${
-              focusedNegocioId === 'ALL_CONSORCIO'
-                ? 'bg-slate-200 text-slate-950'
-                : 'bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-800'
-            }`}
-          >
-            <Building2 className="w-3 h-3" />
-            <span>Vista General (6 Negocios)</span>
-          </button>
-
-          {NEGOCIOS_ACTIVOS_IDS.map((nId) => {
-            const z = NEGOCIOS_ZONES_3D[nId];
-            const active = focusedNegocioId === nId;
-            return (
-              <button
-                key={nId}
-                onClick={() => setFocusedNegocioId(nId)}
-                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold transition border ${
-                  active
-                    ? 'bg-slate-800 text-white border-teal-400 shadow'
-                    : 'bg-slate-900/70 text-slate-300 border-slate-800 hover:bg-slate-800'
-                }`}
-              >
-                <span
-                  className="w-2 h-2 rounded-full"
-                  style={{ backgroundColor: z.colorHex }}
-                />
-                <span>{z.nombre}</span>
-              </button>
-            );
-          })}
-
-          <button
-            onClick={() => setFocusedMedidorId('med_3')}
+            onClick={() => {
+              setIsVistaArcOpen(false);
+              setFocusedMedidorId('med_3');
+            }}
             className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold transition border ${
               focusedNegocioId === 'CFE_METER_INSPECT'
                 ? 'bg-teal-500 text-slate-950 border-teal-300'
@@ -250,7 +230,120 @@ export default function TopTimeBar() {
           </button>
         </div>
 
-        {/* Herramientas de Inventario, Campañas, Modelos SketchUp (.skp) y Colisiones */}
+        {/* Centro: Botón "Vista General" con los 6 negocios desplegándose en arco / semicírculo */}
+        <div className="relative z-50 flex items-center justify-center">
+          {isVistaArcOpen && (
+            <div
+              onClick={() => setIsVistaArcOpen(false)}
+              className="fixed inset-0 z-40 bg-slate-950/35 backdrop-blur-[1px]"
+            />
+          )}
+
+          <button
+            onClick={() => setIsVistaArcOpen((prev) => !prev)}
+            className={`relative z-50 flex items-center gap-2 px-3.5 py-1 rounded-lg text-[11px] font-bold transition border shadow ${
+              isVistaArcOpen || focusedNegocioId === 'ALL_CONSORCIO'
+                ? 'bg-slate-100 text-slate-950 border-white'
+                : 'bg-slate-900 text-white border-teal-500/50 hover:bg-slate-800'
+            }`}
+          >
+            <Building2 className="w-3.5 h-3.5 text-teal-500" />
+            <span>Vista General</span>
+            {activeZone && (
+              <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.2 rounded bg-slate-800 text-slate-200">
+                <span
+                  className="w-1.5 h-1.5 rounded-full"
+                  style={{ backgroundColor: activeZone.colorHex }}
+                />
+                {activeZone.nombre}
+              </span>
+            )}
+            <ChevronDown
+              className={`w-3.5 h-3.5 transition-transform duration-300 ${
+                isVistaArcOpen ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+
+          {/* Arco / Semicírculo Flotante de los 6 Negocios + Consorcio General */}
+          {isVistaArcOpen && (
+            <div className="pointer-events-none absolute left-1/2 top-full z-50 w-0 h-0">
+              {/* Guía visual sutil del arco semicircular */}
+              <svg
+                width="560"
+                height="240"
+                viewBox="-280 -10 560 240"
+                className="pointer-events-none absolute left-0 top-0 -translate-x-1/2 opacity-40"
+              >
+                <path
+                  d={`M ${-radiusX * 0.96} 40 A ${radiusX} ${radiusY} 0 0 0 ${radiusX * 0.96} 40`}
+                  fill="none"
+                  stroke="#2dd4bf"
+                  strokeWidth="1.5"
+                  strokeDasharray="5 5"
+                />
+              </svg>
+
+              {/* Opción Central: Consorcio General (Todos los locales) */}
+              <button
+                onClick={() => {
+                  setFocusedNegocioId('ALL_CONSORCIO');
+                  setIsVistaArcOpen(false);
+                }}
+                style={{
+                  '--arc-x': '0px',
+                  '--arc-y': '72px',
+                  animationDelay: '0ms'
+                }}
+                className={`pointer-events-auto arc-btn-pop absolute left-0 top-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold whitespace-nowrap border shadow-xl transition ${
+                  focusedNegocioId === 'ALL_CONSORCIO'
+                    ? 'bg-teal-400 text-slate-950 border-white'
+                    : 'bg-slate-900/95 text-teal-200 border-teal-400/60 hover:bg-slate-800'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Todo el Consorcio (6 Locales)</span>
+              </button>
+
+              {/* Los 6 Negocios dispuestos en Semicírculo alrededor de Vista General */}
+              {NEGOCIOS_ACTIVOS_IDS.map((nId, idx) => {
+                const z = NEGOCIOS_ZONES_3D[nId];
+                const angleRad = (arcAnglesDeg[idx] * Math.PI) / 180;
+                const arcX = Math.round(Math.cos(angleRad) * radiusX);
+                const arcY = Math.round(Math.sin(angleRad) * radiusY);
+                const active = focusedNegocioId === nId;
+
+                return (
+                  <button
+                    key={nId}
+                    onClick={() => {
+                      setFocusedNegocioId(nId);
+                      setIsVistaArcOpen(false);
+                    }}
+                    style={{
+                      '--arc-x': `${arcX}px`,
+                      '--arc-y': `${arcY}px`,
+                      animationDelay: `${40 + idx * 35}ms`
+                    }}
+                    className={`pointer-events-auto arc-btn-pop absolute left-0 top-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold whitespace-nowrap border shadow-xl backdrop-blur-md transition-colors ${
+                      active
+                        ? 'bg-slate-800 text-white border-teal-400 ring-2 ring-teal-400/40'
+                        : 'bg-slate-950/95 text-slate-100 border-slate-700 hover:border-teal-400/80 hover:bg-slate-900'
+                    }`}
+                  >
+                    <span
+                      className="w-2.5 h-2.5 rounded-full shrink-0"
+                      style={{ backgroundColor: z.colorHex }}
+                    />
+                    <span>{z.nombre}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Derecha: Herramientas de Inventario, Campañas, Modelos SketchUp (.skp) y Colisiones */}
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setInventoryDrawerOpen(true)}
