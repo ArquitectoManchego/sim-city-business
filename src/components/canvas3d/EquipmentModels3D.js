@@ -805,6 +805,58 @@ function buildPubliWorkshop3D(eqKey) {
   return g;
 }
 
+function buildOfficeAppliance3D(eqKey) {
+  const g = new THREE.Group();
+  if (eqKey === 'oc_tv_32') {
+    // Credenza de madera + Smart TV 32" montada
+    addPart(g, new THREE.BoxGeometry(1.45, 0.56, 0.44), matStandard(0x3f2e21, 0.55, 0.08), [0, 0.28, 0]);
+    addPart(g, new THREE.BoxGeometry(1.18, 0.68, 0.05), matStandard(0x0f172a, 0.25, 0.35), [0, 1.04, -0.08]);
+    addPart(
+      g,
+      new THREE.PlaneGeometry(1.08, 0.58),
+      matStandard(0x1e293b, 0.15, 0.05, { emissive: 0x0284c7, emissiveIntensity: 0.08 }),
+      [0, 1.04, -0.052],
+      [0, 0, 0],
+      'tvScreenMesh'
+    );
+    attachLedIndicator(g, [0.52, 0.72, -0.05], 0.022);
+    attachStatusRing(g, 0.72);
+    return g;
+  }
+
+  // oc_laptop_diseno: Escritorio ejecutivo con Laptop + Monitor Diseño 27"
+  addOpenInoxTable(g, 1.48, 0.78, 0.76, 0x334155, 0x1e293b, 0.22);
+  addPart(g, new THREE.BoxGeometry(0.46, 0.02, 0.32), matStandard(0x475569, 0.3, 0.7), [-0.18, 0.78, 0.08]);
+  addPart(
+    g,
+    new THREE.BoxGeometry(0.46, 0.30, 0.018),
+    matStandard(0x0f172a, 0.25, 0.6),
+    [-0.18, 0.92, -0.07],
+    [-0.18, 0, 0]
+  );
+  addPart(
+    g,
+    new THREE.PlaneGeometry(0.42, 0.25),
+    matStandard(0x0ea5e9, 0.15, 0.1, { emissive: 0x0369a1, emissiveIntensity: 0.12 }),
+    [-0.18, 0.92, -0.058],
+    [-0.18, 0, 0],
+    'officeScreenMesh'
+  );
+  // Monitor secundario de arquitectura/vectores
+  addPart(g, new THREE.BoxGeometry(0.68, 0.42, 0.03), matStandard(0x0f172a, 0.25, 0.4), [0.36, 1.06, -0.18]);
+  addPart(
+    g,
+    new THREE.PlaneGeometry(0.62, 0.36),
+    matStandard(0x38bdf8, 0.15, 0.1, { emissive: 0x0284c7, emissiveIntensity: 0.12 }),
+    [0.36, 1.06, -0.16],
+    [0, 0, 0],
+    'officeSecondaryScreenMesh'
+  );
+  attachLedIndicator(g, [0.58, 0.87, -0.14], 0.022);
+  attachStatusRing(g, 0.78);
+  return g;
+}
+
 function buildClimateOrLight3D(eqKey, colorHex) {
   const g = new THREE.Group();
   if (eqKey.includes('ac') || eqKey.includes('cctv')) {
@@ -851,6 +903,9 @@ export function createApplianceModel3D(eqKey, colorHex) {
     eqKey === 'pi_atomstack'
   ) {
     return buildPubliWorkshop3D(eqKey);
+  }
+  if (eqKey === 'oc_tv_32' || eqKey === 'oc_laptop_diseno') {
+    return buildOfficeAppliance3D(eqKey);
   }
   return buildClimateOrLight3D(eqKey, colorHex);
 }
@@ -1152,12 +1207,23 @@ export function updateApplianceVisualState(eqKey, meshGroup, stateInfo, nowSec) 
     if (beam) beam.visible = isWorking;
   }
 
-  // 10. POS Cash drawer pop when charging customer
+  // 10. POS Cash drawer pop when charging customer & Office TV/Laptop screen glow
   if (eqKey.endsWith('_tpv')) {
     const drawer = meshGroup.getObjectByName('posCashDrawer');
     const ticket = meshGroup.getObjectByName('posTicket');
     if (drawer) drawer.position.z = isWorking ? 0.16 : 0;
     if (ticket) ticket.scale.y = isWorking ? 1.5 : 1.0;
+  } else if (eqKey === 'oc_tv_32') {
+    const tvScr = meshGroup.getObjectByName('tvScreenMesh');
+    if (tvScr?.material) {
+      tvScr.material.emissive.setHex(isActive ? 0x38bdf8 : 0x0284c7);
+      tvScr.material.emissiveIntensity = isActive ? 0.85 + Math.sin(nowSec * 3.5) * 0.25 : 0.05;
+    }
+  } else if (eqKey === 'oc_laptop_diseno') {
+    const scr1 = meshGroup.getObjectByName('officeScreenMesh');
+    const scr2 = meshGroup.getObjectByName('officeSecondaryScreenMesh');
+    if (scr1?.material) scr1.material.emissiveIntensity = isActive ? 0.95 : 0.08;
+    if (scr2?.material) scr2.material.emissiveIntensity = isActive ? 0.85 : 0.08;
   }
 }
 
@@ -1229,7 +1295,10 @@ export function updateHandItemVisual(handItemGroup, itemType) {
     addPart(handItemGroup, new THREE.BoxGeometry(0.22, h, 0.28), matStandard(0xf8fafc), [0, 0.02, 0.04]);
   } else if (itemType === 'fabric_roll') {
     addPart(handItemGroup, new THREE.CylinderGeometry(0.08, 0.08, 0.42, 12), matStandard(0x2563eb, 0.7, 0.0), [0, 0.04, 0.04], [0, 0, Math.PI / 2]);
-  } else if (itemType === 'product_bag' || itemType === 'garment_hanger') {
+  } else if (itemType === 'garment_hanger') {
+    addPart(handItemGroup, new THREE.BoxGeometry(0.32, 0.015, 0.015), matStandard(0xcbd5e1, 0.2, 0.8), [0, 0.04, 0.02]);
+    addPart(handItemGroup, new THREE.BoxGeometry(0.26, 0.34, 0.04), matStandard(0x0ea5e9, 0.7, 0.05), [0, -0.14, 0.02]);
+  } else if (itemType === 'product_bag') {
     addPart(handItemGroup, new THREE.BoxGeometry(0.20, 0.24, 0.14), matStandard(0xf59e0b, 0.6, 0.0), [0, -0.02, 0]);
   }
 }

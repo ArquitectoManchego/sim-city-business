@@ -59,7 +59,25 @@ function sanitizeCloudRecetas(rawRecetas) {
       const cloudHasAnim = cloudSteps.some((p) => Boolean(p.animacionVendedor));
       const staleRaspado =
         prodId === 'hp_raspado' && !cloudSteps.some((p) => p.animacionVendedor === 'CRANK_LEFT_HANDLE');
-      if (cloudSteps.length < defSteps.length || (defaultHasAnim && !cloudHasAnim) || staleRaspado) {
+      const staleImperia =
+        prodId === 'imp_uniforme_clinico_completo' &&
+        !cloudSteps.some((p) => String(p.waypointVendedor || '').startsWith('rack_'));
+      const staleCostura =
+        prodId === 'tc_filipina_chef' && !cloudSteps.some((p) => p.codigo === 'MID_SEAM_PRESS');
+      const staleBordado =
+        prodId === 'bv_escudo_aemco' && !cloudSteps.some((p) => p.codigo === 'TAG_AND_DELIVER_TO_IMPERIA');
+      const stalePubli =
+        (prodId === 'pi_dtf_playeras' || prodId === 'pi_sublimacion_plana') &&
+        !cloudSteps.some((p) => p.codigo?.includes('PREHEAT'));
+      if (
+        cloudSteps.length < defSteps.length ||
+        (defaultHasAnim && !cloudHasAnim) ||
+        staleRaspado ||
+        staleImperia ||
+        staleCostura ||
+        staleBordado ||
+        stalePubli
+      ) {
         continue;
       }
     }

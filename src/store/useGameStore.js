@@ -1,16 +1,23 @@
 /**
  * Store Maestro de Simulación de SIM CITY BUSINESS 3D.
  * Gestiona el Reloj Multi-Velocidad (0x, 1x, 10x, 60x, 600x [1h=6s], y saltos de Día/Semana/Mes/Año),
- * Agentes (Empleados y Clientes), Stock de Materia Prima, Red Eléctrica por Medidor CFE y Log en Vivo.
+ * Agentes Sims 2 Reales (Múltiples Empleados, Gerente, Familia 3-4 PM y Clientes), Stock, Queues, Red CFE y Log.
  */
 
 import { create } from 'zustand';
 import {
   NEGOCIOS_ZONES_3D,
+  ALL_ZONES_3D,
   WAYPOINTS_POR_NEGOCIO,
   TAREAS_SIN_CLIENTES_POR_NEGOCIO,
   obtenerCoreografiaProducto
 } from '../engine/ChoreographyRegistry.js';
+import {
+  UNIVERSAL_HUMAN_ROUTINES,
+  IMPERIA_SPECIAL_ROUTINES,
+  calcularETAInsumoExterno
+} from '../engine/ProcessFactory.js';
+import { createDefaultSims2Profiles } from '../components/canvas3d/Sims2AvatarLoader.js';
 import { computeLocalPathAStar } from '../engine/NavMeshGrid.js';
 import {
   evaluarCondicionesDemanda,
@@ -82,7 +89,12 @@ export const EQUIPOS_OPERATIVOS_BASE = {
   pi_epson: { key: 'pi_epson', nombre: 'Impresora Sublimación Epson L120 (20W)', negocioId: 'taller_publi_imperia', medidorId: 'med_3', wattsNominal: 20, fase: 'B', rol: 'produccion' },
   pi_plancha_tazas: { key: 'pi_plancha_tazas', nombre: 'Plancha Sublimación Tazas 11oz (350W)', negocioId: 'taller_publi_imperia', medidorId: 'med_3', wattsNominal: 350, fase: 'A', rol: 'produccion' },
   pi_plancha_plana: { key: 'pi_plancha_plana', nombre: 'Plancha Plana Sublimación/DTF (1000W)', negocioId: 'taller_publi_imperia', medidorId: 'med_3', wattsNominal: 1000, fase: 'A', rol: 'produccion' },
-  pi_atomstack: { key: 'pi_atomstack', nombre: 'Grabadora y Cortadora Láser Atomstack A20 (120W)', negocioId: 'taller_publi_imperia', medidorId: 'med_3', wattsNominal: 120, fase: 'B', rol: 'produccion' }
+  pi_atomstack: { key: 'pi_atomstack', nombre: 'Grabadora y Cortadora Láser Atomstack A20 (120W)', negocioId: 'taller_publi_imperia', medidorId: 'med_3', wattsNominal: 120, fase: 'B', rol: 'produccion' },
+
+  // Oficina Consorcio (med_3 — Clima, Smart TV 32", Laptop Diseño Gerencia)
+  oc_ac_1tr: { key: 'oc_ac_1tr', nombre: 'Minisplit Clima Oficina Consorcio 1 TR (1150W)', negocioId: 'oficinas_consorcio', medidorId: 'med_3', wattsNominal: 1150, fase: 'A', rol: 'produccion' },
+  oc_tv_32: { key: 'oc_tv_32', nombre: 'Smart TV 32" Oficina Consorcio (55W)', negocioId: 'oficinas_consorcio', medidorId: 'med_3', wattsNominal: 55, fase: 'B', rol: 'produccion' },
+  oc_laptop_diseno: { key: 'oc_laptop_diseno', nombre: 'Laptop Diseño PC Oficina Consorcio (65W)', negocioId: 'oficinas_consorcio', medidorId: 'med_3', wattsNominal: 65, fase: 'A', rol: 'produccion' }
 };
 
 function buildInitialEquiposRuntime() {
@@ -129,38 +141,160 @@ function buildInitialStatsPorNegocio() {
       clientesSinCompra: 0
     };
   });
+  stats.oficinas_consorcio = {
+    negocioId: 'oficinas_consorcio',
+    nombre: 'Oficina Consorcio',
+    ingresosHoy: 0,
+    ingresosTotales: 0,
+    costoInsumosHoy: 0,
+    costoInsumosTotales: 0,
+    kwhHoy: 0,
+    kwhMes: 0,
+    kwhAcumulados: 0,
+    ventasHoy: 0,
+    ventasTotales: 0,
+    productosVendidosCount: {},
+    clientesAtendidos: 0,
+    clientesSinCompra: 0
+  };
   return stats;
 }
 
-function buildInitialEmpleados() {
+function createEmployeeEntity(negId, index, customMeta = {}) {
+  const plantilla = PLANTILLA_DEFAULT_NEGOCIOS[negId]?.empleados || [];
+  const meta = plantilla[index] || customMeta || {};
+  const id = meta.id || `${negId}_emp_${index + 1}`;
+  return {
+    id,
+    sims2Id: `emp_${negId}_${index}`,
+    negocioId: negId,
+    index,
+    nombre: meta.nombre || `${NEGOCIOS_ZONES_3D[negId]?.nombre?.split(' ')[0] || 'Staff'} #${index + 1}`,
+    puesto: meta.puesto || 'Operador',
+    posicionLocal: [(index % 2 === 0 ? -0.4 : 0.9), 0, -0.7 - index * 0.35],
+    targetWaypoint: 'barra_vendedor',
+    rutaActual: [],
+    estado: 'IDLE_TASK', // 'IDLE_TASK' | 'ATENDIENDO_CLIENTE' | 'ATENDIENDO_QUEUE' | 'EN_COMIDA' | 'RUTINA_HUMANA'
+    idleTaskIndex: index,
+    idleElapsedSec: 0,
+    textoAccion: 'Listo en mostrador',
+    itemEnMano: null,
+    clienteActualId: null,
+    queueOrderActual: null,
+    recetaActual: null,
+    pasoActualIndex: 0,
+    pasoElapsedSec: 0,
+    pasoCodigoActual: null,
+    pasoDuracionActual: 1.0,
+    animacionActual: null,
+    efectoVisualActual: null,
+    // Reglas laborales y humanas universales (1h comida 1-2 ó 2-3 PM + 1..5 idas al baño + ocio celular sin clientes)
+    lunchStartHour: index % 2 === 0 ? (negId === 'imperia_uniformes' || negId === 'taller_costura' ? 13 : 14) : 13,
+    humanRoutineActual: null,
+    humanRoutineElapsedSec: 0,
+    restroomsToday: 0,
+    maxRestroomsToday: 2 + (index % 4), // 2..5 por día
+    nextRestroomTriggerSec: 1800 + index * 900,
+    workSecondsToday: 0,
+    imperiaOpeningDoneToday: false,
+    imperiaClosingDoneToday: false,
+    imperiaOpenPhaseIndex: 0,
+    imperiaLastDayNum: 15,
+    imperiaDaysWorkedCount: 0
+  };
+}
+
+function buildInitialEmpleadosLista() {
+  const listMap = {};
+  NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
+    listMap[negId] = [createEmployeeEntity(negId, 0)];
+  });
+  return listMap;
+}
+
+function buildInitialEmpleadosFromLista(listMap) {
   const map = {};
   NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
-    const plantilla = PLANTILLA_DEFAULT_NEGOCIOS[negId]?.empleados || [];
-    const emp1 = plantilla[0] || { id: `${negId}_emp_1`, nombre: 'Vendedor Principal', puesto: 'Operador' };
-    map[negId] = {
-      id: emp1.id,
-      negocioId: negId,
-      nombre: emp1.nombre,
-      puesto: emp1.puesto,
-      posicionLocal: [0.0, 0, -0.7],
-      targetWaypoint: 'barra_vendedor',
-      rutaActual: [],
-      estado: 'IDLE_TASK', // 'IDLE_TASK' | 'ATENDIENDO_CLIENTE'
-      idleTaskIndex: 0,
-      idleElapsedSec: 0,
-      textoAccion: 'Listo en mostrador',
-      itemEnMano: null,
-      clienteActualId: null,
-      recetaActual: null,
-      pasoActualIndex: 0,
-      pasoElapsedSec: 0,
-      pasoCodigoActual: null,
-      pasoDuracionActual: 1.0,
-      animacionActual: null,
-      efectoVisualActual: null
-    };
+    map[negId] = (listMap[negId] && listMap[negId][0]) || createEmployeeEntity(negId, 0);
   });
   return map;
+}
+
+function buildInitialGerenteState() {
+  const zoneCenter = ALL_ZONES_3D.taller_publi_imperia.center;
+  const wpLocal = WAYPOINTS_POR_NEGOCIO.taller_publi_imperia.eq_pi_pc_diseno;
+  return {
+    id: 'gerente',
+    sims2Id: 'gerente',
+    nombre: 'Alex (Gerente General)',
+    currentZoneId: 'taller_publi_imperia',
+    targetZoneId: 'taller_publi_imperia',
+    targetWaypoint: 'eq_pi_pc_diseno',
+    posicionLocal: [...wpLocal],
+    worldPos: [zoneCenter[0] + wpLocal[0], 0, zoneCenter[2] + wpLocal[2]],
+    rutaLocal: [],
+    taskType: 'DESIGN_PUBLI',
+    animacionActual: 'OPERATE_TPV',
+    textoAccion: '🎨 Diseñando vectores en Publi-Impresos (Rol principal)',
+    isOutsideSupplyRun: false,
+    supplyProveedor: null,
+    phaseElapsedSec: 0,
+    phaseDurationSec: 45,
+    autoTaskIndex: 0,
+    manualLockUntilSimMs: 0,
+    acOfficeActive: false
+  };
+}
+
+function buildInitialFamiliaState() {
+  const ofCenter = ALL_ZONES_3D.oficinas_consorcio.center;
+  const wpOf = WAYPOINTS_POR_NEGOCIO.oficinas_consorcio;
+  return {
+    visitActive: false,
+    lastVisitDay: 14,
+    locationZone: 'oficinas_consorcio', // 'oficinas_consorcio' | 'hawaiian_paradise'
+    activityMode: 'OFICINA_TV', // 'OFICINA_TV' | 'OFICINA_COMER' | 'OFICINA_BANO' | 'COMER_HAWAIIAN'
+    eatingWithManager: false,
+    visitEndSimMs: 0,
+    miembros: [
+      {
+        id: 'familia_esposa',
+        sims2Id: 'familia_esposa',
+        nombre: 'Esposa',
+        currentZoneId: 'oficinas_consorcio',
+        posicionLocal: [...wpOf.sofa_tv_1],
+        worldPos: [ofCenter[0] + wpOf.sofa_tv_1[0], 0, ofCenter[2] + wpOf.sofa_tv_1[2]],
+        targetWaypoint: 'sofa_tv_1',
+        rutaLocal: [],
+        animacionActual: 'WATCH_TV_SOFA',
+        textoAccion: 'En casa'
+      },
+      {
+        id: 'familia_alex',
+        sims2Id: 'familia_alex',
+        nombre: 'Alex Jr. (12 años)',
+        currentZoneId: 'oficinas_consorcio',
+        posicionLocal: [...wpOf.sofa_tv_2],
+        worldPos: [ofCenter[0] + wpOf.sofa_tv_2[0], 0, ofCenter[2] + wpOf.sofa_tv_2[2]],
+        targetWaypoint: 'sofa_tv_2',
+        rutaLocal: [],
+        animacionActual: 'WATCH_TV_SOFA',
+        textoAccion: 'En casa'
+      },
+      {
+        id: 'familia_barbara',
+        sims2Id: 'familia_barbara',
+        nombre: 'Bárbara (8 años)',
+        currentZoneId: 'oficinas_consorcio',
+        posicionLocal: [...wpOf.sofa_tv_3],
+        worldPos: [ofCenter[0] + wpOf.sofa_tv_3[0], 0, ofCenter[2] + wpOf.sofa_tv_3[2]],
+        targetWaypoint: 'sofa_tv_3',
+        rutaLocal: [],
+        animacionActual: 'WATCH_TV_SOFA',
+        textoAccion: 'En casa'
+      }
+    ]
+  };
 }
 
 function formatTimeHHMMSS(dateObj) {
@@ -175,6 +309,8 @@ function formatDateShort(dateObj) {
   return `${String(dateObj.getDate()).padStart(2, '0')} ${meses[dateObj.getMonth()]} ${dateObj.getFullYear()}`;
 }
 
+const initialListaEmpleados = buildInitialEmpleadosLista();
+
 export const useGameStore = create((set, get) => ({
   // Reloj de simulación: Viernes 15 de Mayo 2026 (Quincena + Temporada de Calor en Veracruz) 10:15:00 AM
   simTimeMs: new Date(2026, 4, 15, 10, 15, 0).getTime(),
@@ -186,7 +322,7 @@ export const useGameStore = create((set, get) => ({
   cashPopups: [], // Popups flotantes StarCraft +$50 arriba de la caja TPV
 
   // Cámara y foco de vista 3D
-  focusedNegocioId: 'hawaiian_paradise', // 'ALL_CONSORCIO' | negocioId | 'CFE_METER_INSPECT'
+  focusedNegocioId: 'hawaiian_paradise', // 'ALL_CONSORCIO' | negocioId | 'oficinas_consorcio' | 'CFE_METER_INSPECT'
   focusedMedidorId: 'med_3',
 
   // Modales del HUD
@@ -194,6 +330,11 @@ export const useGameStore = create((set, get) => ({
   isCfeReceiptModalOpen: false,
   isInventoryDrawerOpen: false,
   isMarketingModalOpen: false,
+  isCasStudioOpen: false,
+  casTargetActorId: 'gerente',
+
+  // Personalización 3D The Sims 2 CAS para Gerente, Familia y Empleados
+  sims2AvataresConfig: createDefaultSims2Profiles(),
 
   // Sincronización con Eléctrico Alacio
   cloudConnected: false,
@@ -219,8 +360,21 @@ export const useGameStore = create((set, get) => ({
     taller_publi_imperia: { activa: true, nombre: 'Regalos Personalizados Tazas, Termos & DTF', intensidadPct: 30, costoDiario: 80 }
   },
 
-  // Agentes 3D y Estadísticas
-  empleadosPorNegocio: buildInitialEmpleados(),
+  // Agentes 3D: Empleados (Multi-empleado 1..4), Gerente, Familia y Queues Inter-Negocio
+  empleadosListaPorNegocio: initialListaEmpleados,
+  empleadosPorNegocio: buildInitialEmpleadosFromLista(initialListaEmpleados),
+  gerenteState: buildInitialGerenteState(),
+  familiaState: buildInitialFamiliaState(),
+  workQueuesPorNegocio: {
+    bordados_veracruz: [],
+    taller_costura: [],
+    taller_publi_imperia: []
+  },
+  waitingPartsQueuePubli: [],
+  pedidosListosImperia: [],
+  almacenB2BPubli: [],
+  cotizacionesPendientesGerente: [],
+
   clientesColaPorNegocio: {
     hawaiian_paradise: [],
     imperia_uniformes: [],
@@ -255,7 +409,7 @@ export const useGameStore = create((set, get) => ({
       horaStr: '10:15:00',
       negocioId: 'consorcio',
       tipo: 'system',
-      mensaje: '⚡ Conectado bidireccionalmente con Eléctrico Casa Alacio Pérez (Firestore electrico-e2896). Día de Quincena activo.'
+      mensaje: '⚡ Conectado bidireccionalmente con Eléctrico Alacio. Motores Sims 2 CAS, Queues Inter-Negocio, Gerente y Familia activos.'
     },
     {
       id: 'log_init_2',
@@ -263,11 +417,11 @@ export const useGameStore = create((set, get) => ({
       horaStr: '10:15:01',
       negocioId: 'hawaiian_paradise',
       tipo: 'info',
-      mensaje: '🍧 Hawaiian Paradise abierto: Máquina de raspados (600W), Crepera (3000W), Licuadora Ninja (2000W) y Gaggia (2640W) listas.'
+      mensaje: '🍧 Hawaiian Paradise abierto: Máquina de raspados con manivela izquierda, Crepera (3000W) y Gaggia listas.'
     }
   ],
 
-  // --- ACCIONES DE CONFIGURACIÓN Y NAVEGACIÓN ---
+  // --- ACCIONES DE CONFIGURACIÓN, NAVEGACIÓN, SIMS 2 CAS, GERENTE Y FAMILIA ---
   setTimeScale: (scale) => set({ timeScale: scale }),
   setFocusedNegocioId: (negId) => set({ focusedNegocioId: negId }),
   setFocusedMedidorId: (medId) => set({ focusedMedidorId: medId, focusedNegocioId: 'CFE_METER_INSPECT' }),
@@ -278,6 +432,235 @@ export const useGameStore = create((set, get) => ({
   setInventoryDrawerOpen: (open) => set({ isInventoryDrawerOpen: open }),
   setMarketingModalOpen: (open) => set({ isMarketingModalOpen: open }),
   setAutoRestockEnabled: (enabled) => set({ autoRestockEnabled: enabled }),
+
+  setCasStudioOpen: (open, actorId = 'gerente') =>
+    set((state) => ({
+      isCasStudioOpen: open,
+      casTargetActorId: actorId || state.casTargetActorId || 'gerente'
+    })),
+
+  updateSims2AvatarConfig: (actorId, partialConfig) =>
+    set((state) => {
+      const existing = state.sims2AvataresConfig[actorId] || createDefaultSims2Profiles().gerente;
+      const merged = {
+        ...existing,
+        ...partialConfig,
+        faceSliders: {
+          ...(existing.faceSliders || {}),
+          ...(partialConfig.faceSliders || {})
+        }
+      };
+      return {
+        sims2AvataresConfig: {
+          ...state.sims2AvataresConfig,
+          [actorId]: merged
+        }
+      };
+    }),
+
+  addEmployeeToNegocio: (negocioId) =>
+    set((state) => {
+      const current = state.empleadosListaPorNegocio[negocioId] || [];
+      if (current.length >= 4) return {};
+      const nextIdx = current.length;
+      const newEmp = createEmployeeEntity(negocioId, nextIdx);
+      const nextList = [...current, newEmp];
+      const baseAvatar = state.sims2AvataresConfig[`emp_${negocioId}_0`] || createDefaultSims2Profiles().gerente;
+      const newAvatar = {
+        ...baseAvatar,
+        id: newEmp.sims2Id,
+        displayName: newEmp.nombre,
+        roleTag: NEGOCIOS_ZONES_3D[negocioId]?.nombre || negocioId,
+        baseModel: nextIdx % 2 === 1 ? (baseAvatar.baseModel === 'male_base' ? 'female_base' : 'male_base') : 'female_casual',
+        gender: nextIdx % 2 === 1 ? (baseAvatar.gender === 'M' ? 'F' : 'M') : 'F',
+        hairStyle: nextIdx % 2 === 1 ? 'ondulado_casual' : 'corto_ejecutivo',
+        hasAura: false,
+        showPlumbob: false
+      };
+      const simDate = new Date(state.simTimeMs);
+      return {
+        empleadosListaPorNegocio: { ...state.empleadosListaPorNegocio, [negocioId]: nextList },
+        sims2AvataresConfig: { ...state.sims2AvataresConfig, [newEmp.sims2Id]: newAvatar },
+        liveLogs: [
+          {
+            id: `log_emp_add_${Date.now()}`,
+            fechaStr: formatDateShort(simDate),
+            horaStr: formatTimeHHMMSS(simDate),
+            negocioId,
+            tipo: 'system',
+            mensaje: `👥 Contratado ${newEmp.nombre} en ${NEGOCIOS_ZONES_3D[negocioId]?.nombre} (${nextList.length}/4 empleados activos).`
+          },
+          ...state.liveLogs.slice(0, 140)
+        ]
+      };
+    }),
+
+  removeEmployeeFromNegocio: (negocioId) =>
+    set((state) => {
+      const current = state.empleadosListaPorNegocio[negocioId] || [];
+      if (current.length <= 1) return {};
+      const removed = current[current.length - 1];
+      const nextList = current.slice(0, -1);
+      return {
+        empleadosListaPorNegocio: { ...state.empleadosListaPorNegocio, [negocioId]: nextList },
+        empleadosPorNegocio: { ...state.empleadosPorNegocio, [negocioId]: nextList[0] },
+        liveLogs: [
+          {
+            id: `log_emp_rem_${Date.now()}`,
+            fechaStr: formatDateShort(new Date(state.simTimeMs)),
+            horaStr: formatTimeHHMMSS(new Date(state.simTimeMs)),
+            negocioId,
+            tipo: 'info',
+            mensaje: `➖ Desasignado ${removed.nombre} de ${NEGOCIOS_ZONES_3D[negocioId]?.nombre}.`
+          },
+          ...state.liveLogs.slice(0, 140)
+        ]
+      };
+    }),
+
+  setEmployeeLunchSlot: (negocioId, empId, startHour) =>
+    set((state) => {
+      const list = state.empleadosListaPorNegocio[negocioId] || [];
+      const h = Number(startHour) === 13 ? 13 : 14;
+      const nextList = list.map((e) => (e.id === empId ? { ...e, lunchStartHour: h } : e));
+      return {
+        empleadosListaPorNegocio: { ...state.empleadosListaPorNegocio, [negocioId]: nextList },
+        empleadosPorNegocio: { ...state.empleadosPorNegocio, [negocioId]: nextList[0] || state.empleadosPorNegocio[negocioId] }
+      };
+    }),
+
+  commandManagerAction: (targetZoneId, taskType = 'SUPERVISE', customText = null) =>
+    set((state) => {
+      // Regla estricta del dueño: en Taller de Costura NUNCA cose; solo supervisa, entrega tela o da instrucciones
+      const resolvedTask = targetZoneId === 'taller_costura' && taskType === 'SEW' ? 'SUPERVISE_COSTURA' : taskType;
+      const wpDefaults = {
+        taller_publi_imperia: 'eq_pi_pc_diseno',
+        oficinas_consorcio: 'eq_oc_laptop_diseno',
+        hawaiian_paradise: 'mesa_1_silla_1',
+        papeleria_imperiarte: 'eq_pap_docucolor',
+        imperia_uniformes: 'caja_tpv_vendedor',
+        taller_costura: 'raw_mesa_corte_telas',
+        bordados_veracruz: 'raw_mesa_bastidores'
+      };
+      const defaultMsgMap = {
+        taller_publi_imperia: '🎨 Gerente: Diseñando / planchando prendas en Publi-Impresos',
+        oficinas_consorcio: '💻 Gerente: Encendiendo Clima A/C y diseñando en Oficina',
+        hawaiian_paradise: '🍽️ Gerente: Visitando mesas y supervisando Hawaiian Paradise',
+        papeleria_imperiarte: '🖨️ Gerente: Imprimiendo en DocuColor y revisando stock Papelería',
+        imperia_uniformes: '📋 Gerente: Revisando caja, pedidos, cotizaciones y estantes Imperia',
+        taller_costura: '🧵 Gerente: Llevando tela y supervisando costura (sin coser)',
+        bordados_veracruz: '🧵 Gerente: Supervisando matrices y pedidos en Bordados'
+      };
+      const simDate = new Date(state.simTimeMs);
+      return {
+        focusedNegocioId: ALL_ZONES_3D[targetZoneId] ? targetZoneId : state.focusedNegocioId,
+        gerenteState: {
+          ...state.gerenteState,
+          targetZoneId,
+          targetWaypoint: wpDefaults[targetZoneId] || 'barra_vendedor',
+          taskType: resolvedTask,
+          isOutsideSupplyRun: taskType === 'PICKUP_SUPPLIES',
+          textoAccion: customText || defaultMsgMap[targetZoneId] || '👔 Gerente en supervisión',
+          manualLockUntilSimMs: state.simTimeMs + 180 * 1000
+        },
+        liveLogs: [
+          {
+            id: `log_mgr_${Date.now()}`,
+            fechaStr: formatDateShort(simDate),
+            horaStr: formatTimeHHMMSS(simDate),
+            negocioId: targetZoneId,
+            tipo: 'system',
+            mensaje: customText || defaultMsgMap[targetZoneId] || `👔 Gerente dirigido a ${targetZoneId}`
+          },
+          ...state.liveLogs.slice(0, 140)
+        ]
+      };
+    }),
+
+  triggerFamiliaVisit: (eatAtHawaiian = false) =>
+    set((state) => {
+      const targetZone = eatAtHawaiian ? 'hawaiian_paradise' : 'oficinas_consorcio';
+      const center = ALL_ZONES_3D[targetZone].center;
+      const wpList = eatAtHawaiian
+        ? ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2']
+        : ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
+      const anim = eatAtHawaiian ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA';
+      const txt = eatAtHawaiian ? '🍧 Comiendo en Hawaiian Paradise con papá' : '📺 Viendo Smart TV con Clima A/C en Oficina';
+      const simDate = new Date(state.simTimeMs);
+      const nextMiembros = state.familiaState.miembros.map((m, i) => ({
+        ...m,
+        currentZoneId: targetZone,
+        targetWaypoint: wpList[i] || 'espera_1',
+        posicionLocal: [0, 0, 4.4],
+        worldPos: [center[0], 0, center[2] + 4.4],
+        animacionActual: anim,
+        textoAccion: txt
+      }));
+      return {
+        focusedNegocioId: targetZone,
+        familiaState: {
+          ...state.familiaState,
+          visitActive: true,
+          lastVisitDay: simDate.getDate(),
+          locationZone: targetZone,
+          activityMode: eatAtHawaiian ? 'COMER_HAWAIIAN' : 'OFICINA_TV',
+          eatingWithManager: eatAtHawaiian,
+          visitEndSimMs: state.simTimeMs + 90 * 60 * 1000,
+          miembros: nextMiembros
+        },
+        gerenteState: eatAtHawaiian
+          ? {
+              ...state.gerenteState,
+              targetZoneId: 'hawaiian_paradise',
+              targetWaypoint: 'mesa_1_silla_2',
+              taskType: 'EAT_WITH_FAMILY',
+              isOutsideSupplyRun: false,
+              textoAccion: '👨‍👩‍👧‍👦 Gerente dejó trabajo para sentarse a comer con Esposa, Alex y Bárbara en Hawaiian Paradise',
+              manualLockUntilSimMs: state.simTimeMs + 45 * 60 * 1000
+            }
+          : state.gerenteState,
+        liveLogs: [
+          {
+            id: `log_fam_${Date.now()}`,
+            fechaStr: formatDateShort(simDate),
+            horaStr: formatTimeHHMMSS(simDate),
+            negocioId: targetZone,
+            tipo: 'client',
+            mensaje: eatAtHawaiian
+              ? '👨‍👩‍👧‍👦 Esposa trajo a Alex (12) y Bárbara (8) a comer a Hawaiian Paradise -> El Gerente dejó su tarea y se sienta en su mesa!'
+              : '👨‍👩‍👧‍👦 Llegó Esposa con Alex (12) y Bárbara (8) a Oficina Consorcio (Smart TV + Clima A/C encendidos).'
+          },
+          ...state.liveLogs.slice(0, 140)
+        ]
+      };
+    }),
+
+  triggerMonthlyInventory: () =>
+    set((state) => {
+      const simDate = new Date(state.simTimeMs);
+      return {
+        focusedNegocioId: 'imperia_uniformes',
+        gerenteState: {
+          ...state.gerenteState,
+          targetZoneId: 'imperia_uniformes',
+          targetWaypoint: 'rack_gastronomia',
+          taskType: 'MONTHLY_INVENTORY',
+          textoAccion: '📦 Gerente supervisando Inventario Completo Mensual de Imperia Uniformes',
+          manualLockUntilSimMs: state.simTimeMs + 120 * 1000
+        },
+        liveLogs: [
+          {
+            id: `log_inv_m_${Date.now()}`,
+            fechaStr: formatDateShort(simDate),
+            horaStr: formatTimeHHMMSS(simDate),
+            negocioId: 'imperia_uniformes',
+            tipo: 'stock',
+            mensaje: '📦 Inventario Completo Mensual iniciado en Imperia Uniformes en presencia del Gerente (revisando los 6 estantes por rama).'
+          },
+          ...state.liveLogs.slice(0, 140)
+        ]
+      };
+    }),
 
   setSimulationDateTime: (year, monthIndex, day, hour = 10, minute = 0) => {
     const newDate = new Date(year, monthIndex, day, hour, minute, 0);
@@ -511,11 +894,13 @@ export const useGameStore = create((set, get) => ({
     const simDeltaSec = clampedRealDt * state.timeScale;
     const nextSimTimeMs = state.simTimeMs + simDeltaSec * 1000;
     const simDate = new Date(nextSimTimeMs);
+    const simHour = simDate.getHours();
 
     const condiciones = evaluarCondicionesDemanda(simDate, state.campanasActivas, state.escenarioGlobal);
     const recetasEntrenadas = useTrainingStore.getState().recetasEntrenadas;
     const collisionBlocksMap = useSceneEditorStore.getState().collisionBlocksByNegocio;
 
+    const nextEmpleadosLista = { ...state.empleadosListaPorNegocio };
     const nextEmpleados = { ...state.empleadosPorNegocio };
     const nextColas = { ...state.clientesColaPorNegocio };
     const nextPostCompra = { ...state.clientesPostCompraPorNegocio };
@@ -523,6 +908,21 @@ export const useGameStore = create((set, get) => ({
     const nextStats = { ...state.statsPorNegocio };
     const nextInventario = { ...state.inventarioPorNegocio };
     const nextEquipos = { ...state.equiposRuntime };
+    const nextWorkQueues = {
+      bordados_veracruz: [...(state.workQueuesPorNegocio?.bordados_veracruz || [])],
+      taller_costura: [...(state.workQueuesPorNegocio?.taller_costura || [])],
+      taller_publi_imperia: [...(state.workQueuesPorNegocio?.taller_publi_imperia || [])]
+    };
+    let nextWaitingPubli = [...(state.waitingPartsQueuePubli || [])];
+    let nextPedidosListos = [...(state.pedidosListosImperia || [])];
+    let nextAlmacenB2B = [...(state.almacenB2BPubli || [])];
+    let nextCotizaciones = [...(state.cotizacionesPendientesGerente || [])];
+    let nextGerente = { ...state.gerenteState };
+    let nextFamilia = {
+      ...state.familiaState,
+      miembros: (state.familiaState?.miembros || []).map((m) => ({ ...m }))
+    };
+
     let nextLogs = state.liveLogs;
     let nextHistorial = state.historialDiario;
     let nextDiasCount = state.diasSimuladosCount;
@@ -545,7 +945,7 @@ export const useGameStore = create((set, get) => ({
       ];
     };
 
-    // Cambio de día calendario -> guardar corte diario en historialDiario y reiniciar contadores diarios
+    // Cambio de día calendario -> guardar corte diario y reiniciar contadores diarios de empleados y kWh
     if (simDate.getDate() !== state.ultimoDiaRegistrado) {
       const esNuevoMes = simDate.getMonth() !== nextUltimoMes;
       nextUltimoDia = simDate.getDate();
@@ -570,56 +970,79 @@ export const useGameStore = create((set, get) => ({
           kwhMes: esNuevoMes ? 0 : (nextStats[nId].kwhMes || 0),
           ventasHoy: 0
         };
+        nextEmpleadosLista[nId] = (nextEmpleadosLista[nId] || []).map((e, idx) => ({
+          ...e,
+          restroomsToday: 0,
+          workSecondsToday: 0,
+          nextRestroomTriggerSec: 1800 + idx * 900,
+          imperiaOpeningDoneToday: false,
+          imperiaClosingDoneToday: false,
+          imperiaOpenPhaseIndex: 0,
+          imperiaLastDayNum: nextUltimoDia,
+          imperiaDaysWorkedCount: (e.imperiaDaysWorkedCount || 0) + 1
+        }));
       });
+      if (nextStats.oficinas_consorcio) {
+        nextStats.oficinas_consorcio = {
+          ...nextStats.oficinas_consorcio,
+          kwhHoy: 0,
+          kwhMes: esNuevoMes ? 0 : (nextStats.oficinas_consorcio.kwhMes || 0)
+        };
+      }
       nextHistorial = [resumenDia, ...nextHistorial.slice(0, 365)];
       pushLog('consorcio', 'daily_close', `📊 Cierre del Día (${resumenDia.fecha}): Ingresos Totales Consorcio = $${totalDiaConsorcio.toFixed(2)} MXN.`);
     }
 
-    // Resetear equipos de producción en modo AUTO a OFF antes de evaluar qué paso activo los está encendiendo
+    // Resetear equipos de producción en modo AUTO a OFF antes de evaluar pasos y ocupación de Oficina
     Object.keys(nextEquipos).forEach((eqKey) => {
       const eq = nextEquipos[eqKey];
       if (eq.controlMode === 'MANUAL_ON') {
         nextEquipos[eqKey] = { ...eq, estado: 'WORK', wattsActuales: eq.wattsNominal };
       } else if (eq.controlMode === 'MANUAL_OFF') {
         nextEquipos[eqKey] = { ...eq, estado: 'OFF', wattsActuales: 0 };
+      } else if (eq.rol === 'continuo_24h') {
+        nextEquipos[eqKey] = { ...eq, estado: 'WORK', wattsActuales: Math.round(eq.wattsNominal * 0.45) };
+      } else if (eq.rol === 'clima') {
+        const enTurno = condiciones.enHorarioOperativo;
+        const factorClima = enTurno ? (0.35 + condiciones.factorClimaUso * 0.45) : 0;
+        nextEquipos[eqKey] = { ...eq, estado: enTurno ? 'WORK' : 'OFF', wattsActuales: Math.round(eq.wattsNominal * factorClima) };
+      } else if (eq.rol === 'turno_fijo') {
+        const enTurno = condiciones.enHorarioOperativo;
+        nextEquipos[eqKey] = { ...eq, estado: enTurno ? 'STANDBY' : 'OFF', wattsActuales: enTurno ? Math.round(eq.wattsNominal * 0.65) : 0 };
       } else {
-        // Modo AUTO
-        if (eq.rol === 'continuo_24h') {
-          nextEquipos[eqKey] = { ...eq, estado: 'WORK', wattsActuales: Math.round(eq.wattsNominal * 0.45) };
-        } else if (eq.rol === 'clima') {
-          const enTurno = condiciones.enHorarioOperativo;
-          const factorClima = enTurno ? (0.35 + condiciones.factorClimaUso * 0.45) : 0;
-          nextEquipos[eqKey] = {
-            ...eq,
-            estado: enTurno ? 'WORK' : 'OFF',
-            wattsActuales: Math.round(eq.wattsNominal * factorClima)
-          };
-        } else if (eq.rol === 'turno_fijo') {
-          const enTurno = condiciones.enHorarioOperativo;
-          nextEquipos[eqKey] = {
-            ...eq,
-            estado: enTurno ? 'STANDBY' : 'OFF',
-            wattsActuales: enTurno ? Math.round(eq.wattsNominal * 0.65) : 0
-          };
-        } else {
-          // Equipo de producción (raspadora, crepera, licuadora, cafetera, docucolor, bordadora, etc.)
-          nextEquipos[eqKey] = { ...eq, estado: 'OFF', wattsActuales: 0 };
-        }
+        nextEquipos[eqKey] = { ...eq, estado: 'OFF', wattsActuales: 0 };
       }
     });
 
-    // Velocidad de caminata de los agentes en el espacio 3D (metros por segundo simulado)
-    const walkSpeedMps = state.timeScale > 20 ? 6.5 : 2.35;
+    // Liberar de Sync-Gate de Publi-Impresos cuando prenda E impresión externa ya llegaron
+    if (nextWaitingPubli.length > 0) {
+      const stillWaiting = [];
+      for (const job of nextWaitingPubli) {
+        if (nextSimTimeMs >= (job.prendaReadyMs || 0) && nextSimTimeMs >= (job.printReadyMs || 0)) {
+          nextWorkQueues.taller_publi_imperia.push({ ...job, readyToPress: true });
+          pushLog(
+            'taller_publi_imperia',
+            'stock',
+            `✅ Prenda e Impresión [${job.proveedorInfo || 'DTF/Sublimación'}] listos en Publi-Impresos para planchado.`
+          );
+        } else {
+          stillWaiting.push(job);
+        }
+      }
+      nextWaitingPubli = stillWaiting;
+    }
+
+    const walkSpeedMps = state.timeScale > 20 ? 6.5 : 2.4;
 
     const moveActorTowardsWaypoint = (actor, waypointKey, negId) => {
       const wpMap = WAYPOINTS_POR_NEGOCIO[negId] || WAYPOINTS_POR_NEGOCIO.hawaiian_paradise;
       const targetCoords = wpMap[waypointKey] || [0, 0, 0];
-      const [ax, , az] = actor.posicionLocal;
+      const [ax, , az] = actor.posicionLocal || [0, 0, 0];
       const distFinal = Math.hypot(targetCoords[0] - ax, targetCoords[2] - az);
       if (distFinal <= 0.18) {
         actor.posicionLocal = [targetCoords[0], 0, targetCoords[2]];
         actor.rutaActual = [];
-        return true; // Llegó al waypoint
+        return true;
       }
 
       if (!actor.rutaActual || actor.rutaActual.length === 0 || actor.targetWaypoint !== waypointKey) {
@@ -637,20 +1060,101 @@ export const useGameStore = create((set, get) => ({
         actor.posicionLocal = [nextNode[0], 0, nextNode[2]];
         actor.rutaActual.shift();
         return actor.rutaActual.length === 0;
-      } else {
-        actor.posicionLocal = [
-          ax + (dx / distNode) * stepDist,
-          0,
-          az + (dz / distNode) * stepDist
-        ];
-        return false;
       }
+      actor.posicionLocal = [ax + (dx / distNode) * stepDist, 0, az + (dz / distNode) * stepDist];
+      return false;
     };
 
-    // Procesar cada unidad de negocio
+    const moveWorldAgentTowardsTarget = (agent, targetZoneId, targetWp) => {
+      const zone = ALL_ZONES_3D[targetZoneId] || NEGOCIOS_ZONES_3D.taller_publi_imperia;
+      const wpMap = WAYPOINTS_POR_NEGOCIO[targetZoneId] || WAYPOINTS_POR_NEGOCIO.hawaiian_paradise;
+      const targetLocal = wpMap[targetWp] || [0, 0, 0];
+      const destWorld = [zone.center[0] + targetLocal[0], 0, zone.center[2] + targetLocal[2]];
+
+      if (agent.isOutsideSupplyRun && targetZoneId === 'EXTERIOR_PROVEEDORES') {
+        const extPoint = [24, 0, 15];
+        const dx = extPoint[0] - agent.worldPos[0];
+        const dz = extPoint[2] - agent.worldPos[2];
+        const d = Math.hypot(dx, dz);
+        if (d <= 0.3) {
+          agent.worldPos = extPoint;
+          return true;
+        }
+        const step = walkSpeedMps * 1.45 * simDeltaSec;
+        agent.worldPos = step >= d ? extPoint : [agent.worldPos[0] + (dx / d) * step, 0, agent.worldPos[2] + (dz / d) * step];
+        return step >= d;
+      }
+
+      // Si ya se encuentra dentro de la zona destino -> navegación interior con A*
+      const distToZoneCenter = Math.hypot(agent.worldPos[0] - zone.center[0], agent.worldPos[2] - zone.center[2]);
+      if (agent.currentZoneId === targetZoneId || distToZoneCenter < Math.max(zone.size[0], zone.size[2]) * 0.55) {
+        agent.currentZoneId = targetZoneId;
+        const localCur = [agent.worldPos[0] - zone.center[0], 0, agent.worldPos[2] - zone.center[2]];
+        const helper = {
+          posicionLocal: localCur,
+          targetWaypoint: agent.targetWaypoint,
+          rutaActual: agent.rutaLocal || []
+        };
+        const arrived = moveActorTowardsWaypoint(helper, targetWp, targetZoneId);
+        agent.posicionLocal = helper.posicionLocal;
+        agent.targetWaypoint = targetWp;
+        agent.rutaLocal = helper.rutaActual;
+        agent.worldPos = [zone.center[0] + helper.posicionLocal[0], 0, zone.center[2] + helper.posicionLocal[2]];
+        return arrived;
+      }
+
+      // Caminata inter-local por la acera / avenida central entre módulos
+      agent.currentZoneId = null;
+      agent.rutaLocal = [];
+      const doorWorld = [zone.center[0], 0, zone.center[2] + zone.size[2] / 2 + 0.5];
+      const dx = doorWorld[0] - agent.worldPos[0];
+      const dz = doorWorld[2] - agent.worldPos[2];
+      const dist = Math.hypot(dx, dz);
+      const step = walkSpeedMps * 1.35 * simDeltaSec;
+      if (step >= dist) {
+        agent.worldPos = doorWorld;
+        agent.currentZoneId = targetZoneId;
+        agent.posicionLocal = [0, 0, zone.size[2] / 2 + 0.4];
+        return false;
+      }
+      agent.worldPos = [agent.worldPos[0] + (dx / dist) * step, 0, agent.worldPos[2] + (dz / dist) * step];
+      return false;
+    };
+
+    const registrarVentaCompleta = (negId, clienteActivo, prodVendido) => {
+      const precio = parseFloat(prodVendido?.precioVenta) || 45;
+      const costoMat = parseFloat(prodVendido?.costoMateriales) || 10;
+      const st = nextStats[negId];
+      const prevCount = st.productosVendidosCount[prodVendido.id] || 0;
+      if (!clienteActivo.pagoEmitido) {
+        clienteActivo.pagoEmitido = true;
+        nextCashPopups.push({
+          id: `cash_${realNowMs}_${Math.random().toString(36).slice(2, 7)}`,
+          negocioId: negId,
+          monto: precio,
+          createdAtMs: realNowMs
+        });
+      }
+      nextStats[negId] = {
+        ...st,
+        ingresosHoy: st.ingresosHoy + precio,
+        ingresosTotales: st.ingresosTotales + precio,
+        costoInsumosHoy: (st.costoInsumosHoy || 0) + costoMat,
+        costoInsumosTotales: st.costoInsumosTotales + costoMat,
+        ventasHoy: st.ventasHoy + 1,
+        ventasTotales: st.ventasTotales + 1,
+        clientesAtendidos: st.clientesAtendidos + 1,
+        productosVendidosCount: {
+          ...st.productosVendidosCount,
+          [prodVendido.id]: prevCount + 1
+        }
+      };
+    };
+
+    // Procesar cada unidad de negocio con soporte multi-empleado (1..4) y queues inter-empresa
     NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
-      const emp = { ...nextEmpleados[negId] };
-      const cola = [...(nextColas[negId] || [])];
+      const empLista = (nextEmpleadosLista[negId] || [nextEmpleados[negId]]).map((e) => ({ ...e }));
+      let cola = [...(nextColas[negId] || [])].map((c) => ({ ...c }));
       const postList = [...(nextPostCompra[negId] || [])];
 
       // 1. Spawning probabilístico de nuevos clientes
@@ -661,7 +1165,7 @@ export const useGameStore = create((set, get) => ({
       if (nextSpawnAcc[negId] >= 1.0) {
         const cantSpawn = Math.floor(nextSpawnAcc[negId]);
         nextSpawnAcc[negId] -= cantSpawn;
-        if (cola.length < 4) {
+        if (cola.length < 4 + empLista.length) {
           const nuevoCli = crearEntidadCliente(negId, condiciones);
           cola.push(nuevoCli);
           if (state.timeScale <= 60) {
@@ -670,7 +1174,7 @@ export const useGameStore = create((set, get) => ({
         }
       }
 
-      // 2. Actualizar clientes que están consumiendo en mesa, de pie o saliendo del local
+      // 2. Actualizar clientes post-compra en mesa, de pie o saliendo del local
       const remainingPost = [];
       for (let i = 0; i < postList.length; i++) {
         const cPost = { ...postList[i] };
@@ -680,7 +1184,7 @@ export const useGameStore = create((set, get) => ({
           if (cPost.tiempoRestanteSeg <= 0) {
             if (cPost.targetWaypoint !== 'acera_exterior') {
               cPost.targetWaypoint = 'acera_exterior';
-              cPost.globoTexto = '¡Estuvo buenísimo! Hasta luego.';
+              cPost.globoTexto = '¡Estuvo excelente! Hasta luego.';
               cPost.tiempoRestanteSeg = 4;
               remainingPost.push(cPost);
             }
@@ -693,289 +1197,516 @@ export const useGameStore = create((set, get) => ({
       }
       nextPostCompra[negId] = remainingPost;
 
-      // 3. Máquina de estados del Empleado y Cliente Activo
-      if (cola.length > 0) {
-        const clienteActivo = { ...cola[0] };
-        cola[0] = clienteActivo;
+      // 3. Procesar cada empleado activo del local en paralelo
+      for (let eIdx = 0; eIdx < empLista.length; eIdx++) {
+        const emp = empLista[eIdx];
+        emp.workSecondsToday = (emp.workSecondsToday || 0) + simDeltaSec;
+        const lunchH = emp.lunchStartHour || 13;
+        const enHorarioComida = simHour >= lunchH && simHour < lunchH + 1;
 
-        // Cargar receta entrenada o canónica para el producto deseado del cliente
-        if (emp.estado !== 'ATENDIENDO_CLIENTE' || emp.clienteActualId !== clienteActivo.id || !emp.recetaActual) {
-          const receta = obtenerCoreografiaProducto(
-            clienteActivo.productoDeseado.id,
-            negId,
-            recetasEntrenadas
-          );
-          emp.estado = 'ATENDIENDO_CLIENTE';
-          emp.clienteActualId = clienteActivo.id;
-          emp.recetaActual = receta;
-          emp.pasoActualIndex = 0;
-          emp.pasoElapsedSec = 0;
+        // A) Verificar hora de comida obligatoria (1:00-2:00 PM o 2:00-3:00 PM) si no está mitad de venta urgente
+        if (enHorarioComida && emp.estado !== 'ATENDIENDO_CLIENTE') {
+          emp.estado = 'EN_COMIDA';
+          emp.itemEnMano = null;
+          emp.animacionActual = 'EAT_AT_TABLE';
+          emp.textoAccion = `🍽️ Hora de comida (${lunchH}:00–${lunchH + 1}:00 PM)`;
+          moveActorTowardsWaypoint(emp, 'espera_1', negId);
+          empLista[eIdx] = emp;
+          continue;
+        } else if (!enHorarioComida && emp.estado === 'EN_COMIDA') {
+          emp.estado = 'IDLE_TASK';
+          emp.animacionActual = null;
         }
 
-        const pasos = emp.recetaActual.pasos || [];
-        const paso = pasos[emp.pasoActualIndex] || pasos[0];
+        // B) Apertura de Imperia Uniformes (sacar maniquíes, caja, pedidos, acomodar racks)
+        if (
+          negId === 'imperia_uniformes' &&
+          eIdx === 0 &&
+          !emp.imperiaOpeningDoneToday &&
+          cola.length === 0 &&
+          emp.estado === 'IDLE_TASK'
+        ) {
+          const openSteps = IMPERIA_SPECIAL_ROUTINES.apertura;
+          const stepOpen = openSteps[emp.imperiaOpenPhaseIndex % openSteps.length];
+          emp.textoAccion = stepOpen.texto;
+          emp.animacionActual = stepOpen.animacion || 'OPERATE_TPV';
+          if (moveActorTowardsWaypoint(emp, stepOpen.waypoint, negId)) {
+            emp.idleElapsedSec = (emp.idleElapsedSec || 0) + simDeltaSec;
+            if (emp.idleElapsedSec >= stepOpen.duracion) {
+              emp.idleElapsedSec = 0;
+              if (stepOpen.codigo === 'SETUP_MANNEQUINS') {
+                pushLog(negId, 'info', '🧍 Encargada sacó los maniquíes a la entrada de Imperia Uniformes y abrió caja.');
+              }
+              if (emp.imperiaOpenPhaseIndex + 1 >= openSteps.length) {
+                emp.imperiaOpeningDoneToday = true;
+              } else {
+                emp.imperiaOpenPhaseIndex += 1;
+              }
+            }
+          }
+          empLista[eIdx] = emp;
+          continue;
+        }
 
-        if (paso) {
-          const wpCli = paso.waypointCliente || 'barra_cliente';
-          const wpVen = paso.waypointVendedor || 'barra_vendedor';
+        // C) Asignar cliente esperando O trabajo interno de queue si el empleado está libre
+        if (emp.estado !== 'ATENDIENDO_CLIENTE' && emp.estado !== 'ATENDIENDO_QUEUE') {
+          const unassignedClient = cola.find((c) => !c.atendidoPorEmpId);
+          if (unassignedClient) {
+            unassignedClient.atendidoPorEmpId = emp.id;
+            const receta = obtenerCoreografiaProducto(
+              unassignedClient.productoDeseado.id,
+              negId,
+              recetasEntrenadas
+            );
+            emp.estado = 'ATENDIENDO_CLIENTE';
+            emp.clienteActualId = unassignedClient.id;
+            emp.recetaActual = receta;
+            emp.pasoActualIndex = 0;
+            emp.pasoElapsedSec = 0;
+            emp.humanRoutineActual = null;
+          } else if (nextWorkQueues[negId] && nextWorkQueues[negId].length > 0) {
+            const ordenInterna = nextWorkQueues[negId].shift();
+            const recetaQueue = obtenerCoreografiaProducto(ordenInterna.productoId, negId, recetasEntrenadas);
+            emp.estado = 'ATENDIENDO_QUEUE';
+            emp.queueOrderActual = ordenInterna;
+            emp.recetaActual = recetaQueue;
+            emp.pasoActualIndex = 0;
+            emp.pasoElapsedSec = 0;
+            emp.humanRoutineActual = null;
+          }
+        }
 
-          const cliArrived = moveActorTowardsWaypoint(clienteActivo, wpCli, negId);
-          const venArrived = moveActorTowardsWaypoint(emp, wpVen, negId);
+        // D) Ejecutar atención a cliente asignado
+        if (emp.estado === 'ATENDIENDO_CLIENTE') {
+          const cliIdx = cola.findIndex((c) => c.id === emp.clienteActualId);
+          if (cliIdx === -1) {
+            emp.estado = 'IDLE_TASK';
+            emp.clienteActualId = null;
+            emp.recetaActual = null;
+          } else {
+            const clienteActivo = cola[cliIdx];
+            const pasos = emp.recetaActual?.pasos || [];
+            const paso = pasos[emp.pasoActualIndex] || pasos[0];
+            if (paso) {
+              const wpCli = paso.waypointCliente || 'barra_cliente';
+              const wpVen = paso.waypointVendedor || 'barra_vendedor';
+              const cliArrived = moveActorTowardsWaypoint(clienteActivo, wpCli, negId);
+              const venArrived = moveActorTowardsWaypoint(emp, wpVen, negId);
 
-          clienteActivo.globoTexto = paso.dialogoCliente || null;
-          emp.textoAccion = paso.dialogoVendedor || paso.titulo;
-          emp.itemEnMano = paso.itemManoVendedor || null;
-          emp.pasoCodigoActual = paso.codigo || null;
-          emp.pasoDuracionActual = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
-          emp.animacionActual = paso.animacionVendedor || null;
-          emp.efectoVisualActual = paso.efectoVisual || null;
+              clienteActivo.globoTexto = paso.dialogoCliente || null;
+              emp.textoAccion = paso.dialogoVendedor || paso.titulo;
+              emp.itemEnMano = paso.itemManoVendedor || null;
+              emp.pasoCodigoActual = paso.codigo || null;
+              emp.pasoDuracionActual = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
+              emp.animacionActual = paso.animacionVendedor || null;
+              emp.efectoVisualActual = paso.efectoVisual || null;
 
-          // Encender el equipo eléctrico del paso si corresponde y está en modo AUTO
-          if (paso.equipoKey && nextEquipos[paso.equipoKey]) {
-            const eqTarget = nextEquipos[paso.equipoKey];
-            if (eqTarget.controlMode === 'AUTO') {
-              const wattsActivos = paso.estadoEquipo === 'OFF'
-                ? 0
-                : Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0));
+              if (paso.equipoKey && nextEquipos[paso.equipoKey] && nextEquipos[paso.equipoKey].controlMode === 'AUTO') {
+                const eqTarget = nextEquipos[paso.equipoKey];
+                const wattsActivos = paso.estadoEquipo === 'OFF'
+                  ? 0
+                  : Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0));
+                nextEquipos[paso.equipoKey] = {
+                  ...eqTarget,
+                  estado: paso.estadoEquipo || 'WORK',
+                  wattsActuales: wattsActivos
+                };
+              }
+
+              if ((cliArrived && venArrived) || state.timeScale >= 60) {
+                emp.pasoElapsedSec += simDeltaSec;
+                const durRequerida = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
+                if (emp.pasoElapsedSec >= durRequerida) {
+                  // Consumo de materia prima + auto-recompra
+                  if (paso.insumoId && paso.cantidadInsumo > 0) {
+                    const invList = [...(nextInventario[negId] || [])];
+                    const idxIns = invList.findIndex((ins) => ins.id === paso.insumoId);
+                    if (idxIns !== -1) {
+                      const ins = { ...invList[idxIns] };
+                      ins.stockActual = Math.max(0, Math.round((ins.stockActual - paso.cantidadInsumo) * 100) / 100);
+                      if (ins.stockActual <= ins.puntoReorden && state.autoRestockEnabled) {
+                        const costoLote = ins.loteRecompra * ins.costoUnitario;
+                        ins.stockActual = Math.round((ins.stockActual + ins.loteRecompra) * 100) / 100;
+                        nextStats[negId] = { ...nextStats[negId], costoInsumosTotales: nextStats[negId].costoInsumosTotales + costoLote };
+                        pushLog(negId, 'stock', `🔄 Auto-Recompra [${ins.nombre}] (+${ins.loteRecompra} ${ins.unidad}, -$${costoLote.toFixed(2)}).`);
+                      }
+                      invList[idxIns] = ins;
+                      nextInventario[negId] = invList;
+                    }
+                  }
+
+                  // Desgaste real de hielo cada 10 raspados
+                  if (paso.codigo === 'INSERT_ICE_BLOCK' && nextEquipos.hp_raspadora) {
+                    const maxRasp = nextEquipos.hp_raspadora.maxRaspadosPorBloque || 10;
+                    nextEquipos.hp_raspadora = { ...nextEquipos.hp_raspadora, raspadosRestantesHielo: maxRasp };
+                    pushLog(negId, 'stock', `🧊 Bloque de hielo nuevo cargado en raspadora (${maxRasp}/${maxRasp} raspados).`);
+                  } else if ((paso.codigo === 'PUSH_LEVER_SHAVE_ICE' || paso.codigo === 'SHAVE_ICE') && nextEquipos.hp_raspadora) {
+                    const prevRasp = nextEquipos.hp_raspadora.raspadosRestantesHielo ?? 10;
+                    nextEquipos.hp_raspadora = { ...nextEquipos.hp_raspadora, raspadosRestantesHielo: Math.max(0, prevRasp - 1) };
+                  }
+
+                  // Popup StarCraft +$XX arriba de la caja TPV
+                  const esPasoPago =
+                    paso.waypointCliente === 'caja_tpv_cliente' ||
+                    paso.waypointVendedor === 'caja_tpv_vendedor' ||
+                    (paso.codigo || '').includes('PAY') ||
+                    (paso.codigo || '').includes('CHECKOUT');
+                  if (esPasoPago && !clienteActivo.pagoEmitido) {
+                    const montoPago = parseFloat(clienteActivo.productoDeseado?.precioVenta) || 45;
+                    clienteActivo.pagoEmitido = true;
+                    nextCashPopups.push({
+                      id: `cash_${realNowMs}_${Math.random().toString(36).slice(2, 7)}`,
+                      negocioId: negId,
+                      monto: montoPago,
+                      createdAtMs: realNowMs
+                    });
+                  }
+
+                  if (emp.pasoActualIndex + 1 < pasos.length) {
+                    emp.pasoActualIndex += 1;
+                    emp.pasoElapsedSec = 0;
+
+                    const nextPasoCheck = pasos[emp.pasoActualIndex];
+                    if (
+                      nextPasoCheck?.codigo === 'INSERT_ICE_BLOCK' &&
+                      (nextEquipos.hp_raspadora?.raspadosRestantesHielo ?? 10) > 0 &&
+                      emp.pasoActualIndex + 1 < pasos.length
+                    ) {
+                      emp.pasoActualIndex += 1;
+                    }
+
+                    // Si en probador Imperia no le gustó, no compra pero queda prenda pendiente por devolver a su rack
+                    if (
+                      negId === 'imperia_uniformes' &&
+                      paso.codigo === 'CLIENT_TRY_DRESSING_ROOM' &&
+                      !clienteActivo.compraraTrasPrueba
+                    ) {
+                      nextStats[negId] = { ...nextStats[negId], clientesSinCompra: nextStats[negId].clientesSinCompra + 1 };
+                      pushLog(negId, 'info', `🚪 ${clienteActivo.nombre} probó en vestidor de Imperia pero no compró hoy; prenda por regresar a estante.`);
+                      const [cliSaliente] = cola.splice(cliIdx, 1);
+                      cliSaliente.targetWaypoint = 'acera_exterior';
+                      cliSaliente.tiempoRestanteSeg = 5;
+                      cliSaliente.globoTexto = 'Gracias, regreso luego.';
+                      nextPostCompra[negId] = [...nextPostCompra[negId], cliSaliente];
+                      emp.estado = 'IDLE_TASK';
+                      emp.clienteActualId = null;
+                      emp.recetaActual = null;
+                    }
+                  } else {
+                    // Venta completa -> registrar stats + enrutar a Bordados / Taller Costura / Publi-Impresos
+                    const prodVendido = clienteActivo.productoDeseado;
+                    registrarVentaCompleta(negId, clienteActivo, prodVendido);
+                    const routes = emp.recetaActual?.routesToQueue || {};
+
+                    if (negId === 'imperia_uniformes') {
+                      if (routes.bordados || prodVendido.id === 'imp_chef_gastronomia' || prodVendido.id === 'imp_conjunto_enfermeria') {
+                        nextWorkQueues.bordados_veracruz.push({
+                          id: `ord_bv_${Date.now()}`,
+                          productoId: 'bv_escudo_aemco',
+                          clienteOrigen: clienteActivo.nombre,
+                          origen: 'Imperia Uniformes'
+                        });
+                        pushLog('bordados_veracruz', 'stock', `🧵 Pedido enviado desde Imperia Uniformes al queue de Bordados Veracruz (${clienteActivo.nombre}).`);
+                      }
+                      if (routes.tallerCostura || prodVendido.id === 'imp_pedido_b2b_empresa' || prodVendido.id === 'imp_pedido_corporativo_lote') {
+                        nextWorkQueues.taller_costura.push({
+                          id: `ord_tc_${Date.now()}`,
+                          productoId: 'tc_filipina_chef',
+                          clienteOrigen: clienteActivo.nombre,
+                          origen: 'Imperia B2B'
+                        });
+                        pushLog('taller_costura', 'stock', `🧥 Pedido B2B / personalizado en queue de Taller Imperia Costura (${clienteActivo.nombre}).`);
+                      }
+                      if (routes.publiImpresos) {
+                        const etaDtf = calcularETAInsumoExterno('DTF_COMBI_PROMOX', simDate, condiciones.esQuincena);
+                        nextWaitingPubli.push({
+                          id: `ord_pi_${Date.now()}`,
+                          productoId: 'pi_dtf_playeras',
+                          clienteOrigen: clienteActivo.nombre,
+                          prendaReadyMs: nextSimTimeMs + 15000,
+                          printReadyMs: nextSimTimeMs + 30000, // Simula espera de impresión mientras llega el DTF
+                          proveedorInfo: etaDtf.proveedor
+                        });
+                        pushLog('taller_publi_imperia', 'stock', `🖨️ Pedido DTF en espera de sincronía (prenda + impresión en ${etaDtf.proveedor}).`);
+                      }
+                    }
+
+                    const [cliTerminado] = cola.splice(cliIdx, 1);
+                    cliTerminado.tieneProductoEnMano = true;
+                    let postDestino = 'acera_exterior';
+                    if (negId === 'hawaiian_paradise') {
+                      if (cliTerminado.decisionPostCompra === 'sentado_mesa') {
+                        postDestino = Math.random() < 0.5 ? 'mesa_1_silla_1' : 'mesa_2_silla_1';
+                        cliTerminado.globoTexto = `😋 Disfrutando ${prodVendido.nombre} en mesa`;
+                      } else if (cliTerminado.decisionPostCompra === 'de_pie') {
+                        postDestino = Math.random() < 0.5 ? 'consumo_pie_1' : 'consumo_pie_2';
+                        cliTerminado.globoTexto = `🍧 Consumiendo ${prodVendido.nombre} de pie`;
+                      }
+                    } else {
+                      cliTerminado.globoTexto = '¡Excelente servicio!';
+                    }
+                    cliTerminado.targetWaypoint = postDestino;
+                    cliTerminado.tiempoRestanteSeg = cliTerminado.tiempoConsumoPostSeg || 15;
+                    nextPostCompra[negId] = [...nextPostCompra[negId], cliTerminado];
+
+                    pushLog(negId, 'sale', `💰 Venta en ${NEGOCIOS_ZONES_3D[negId].nombre}: ${prodVendido.nombre} (+$${(parseFloat(prodVendido.precioVenta) || 45).toFixed(2)} MXN).`);
+                    emp.estado = 'IDLE_TASK';
+                    emp.clienteActualId = null;
+                    emp.recetaActual = null;
+                    emp.itemEnMano = null;
+                    emp.pasoCodigoActual = null;
+                    emp.animacionActual = null;
+                    emp.efectoVisualActual = null;
+                  }
+                }
+              }
+            }
+          }
+        } else if (emp.estado === 'ATENDIENDO_QUEUE' && emp.recetaActual) {
+          // E) Ejecutar orden interna en paralelo (Costura secuencia 9 pasos, Bordados, Publi DTF/Sublimación/Vinil)
+          const pasos = emp.recetaActual.pasos || [];
+          const paso = pasos[emp.pasoActualIndex] || pasos[0];
+          if (paso) {
+            const venArrived = moveActorTowardsWaypoint(emp, paso.waypointVendedor || 'barra_vendedor', negId);
+            emp.textoAccion = `[Queue] ${paso.dialogoVendedor || paso.titulo}`;
+            emp.itemEnMano = paso.itemManoVendedor || null;
+            emp.pasoCodigoActual = paso.codigo || null;
+            emp.animacionActual = paso.animacionVendedor || null;
+
+            if (paso.equipoKey && nextEquipos[paso.equipoKey] && nextEquipos[paso.equipoKey].controlMode === 'AUTO') {
+              const eqTarget = nextEquipos[paso.equipoKey];
               nextEquipos[paso.equipoKey] = {
                 ...eqTarget,
                 estado: paso.estadoEquipo || 'WORK',
-                wattsActuales: wattsActivos
+                wattsActuales: Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0))
               };
             }
+
+            if (venArrived || state.timeScale >= 60) {
+              emp.pasoElapsedSec += simDeltaSec;
+              const dur = Math.max(1.0, parseFloat(paso.duracionSegundos) || 12.0);
+              if (emp.pasoElapsedSec >= dur) {
+                if (emp.pasoActualIndex + 1 < pasos.length) {
+                  emp.pasoActualIndex += 1;
+                  emp.pasoElapsedSec = 0;
+                } else {
+                  const recetaFin = emp.recetaActual;
+                  if (recetaFin.esLoteB2B) {
+                    nextAlmacenB2B = [
+                      { id: `box_${Date.now()}`, titulo: recetaFin.nombreProducto, piezas: recetaFin.cantidadLote || 50 },
+                      ...nextAlmacenB2B.slice(0, 12)
+                    ];
+                    pushLog('taller_publi_imperia', 'stock', `📦 Lote B2B empacado en cajas y guardado en Almacén de Publi-Impresos para entrega directa a empresa cliente.`);
+                  } else if (recetaFin.deliversToImperia) {
+                    nextPedidosListos = [
+                      {
+                        id: `ready_${Date.now()}`,
+                        origen: NEGOCIOS_ZONES_3D[negId].nombre,
+                        cliente: emp.queueOrderActual?.clienteOrigen || 'Stock Imperia',
+                        nombre: recetaFin.nombreProducto
+                      },
+                      ...nextPedidosListos.slice(0, 14)
+                    ];
+                    pushLog('imperia_uniformes', 'stock', `🏷️ Pedido terminado de ${NEGOCIOS_ZONES_3D[negId].nombre} recibido en Rack de Pedidos Listos de Imperia.`);
+                  }
+                  emp.estado = 'IDLE_TASK';
+                  emp.queueOrderActual = null;
+                  emp.recetaActual = null;
+                  emp.itemEnMano = null;
+                  emp.animacionActual = null;
+                }
+              }
+            }
+          }
+        } else {
+          // F) Sin clientes ni queue -> Idas al baño (1-5/día), WhatsApp/YouTube solo sin clientes, y rutinas operativas
+          emp.estado = 'IDLE_TASK';
+          emp.itemEnMano = null;
+          emp.pasoCodigoActual = null;
+          emp.efectoVisualActual = null;
+
+          // Verificar si toca ida al baño fisiológica (1 a 5 veces en la jornada)
+          if (
+            !emp.humanRoutineActual &&
+            emp.restroomsToday < (emp.maxRestroomsToday || 3) &&
+            emp.workSecondsToday >= (emp.nextRestroomTriggerSec || 1800)
+          ) {
+            emp.humanRoutineActual = UNIVERSAL_HUMAN_ROUTINES[0]; // RESTROOM_BREAK
+            emp.humanRoutineElapsedSec = 0;
+            emp.restroomsToday += 1;
+            emp.nextRestroomTriggerSec = emp.workSecondsToday + 3600 + Math.random() * 2400;
           }
 
-          // Avanzar tiempo del paso cuando los actores llegaron a su estación (o inmediato en velocidad alta >= 60x)
-          if ((cliArrived && venArrived) || state.timeScale >= 60) {
-            emp.pasoElapsedSec += simDeltaSec;
-            const durRequerida = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
-
-            if (emp.pasoElapsedSec >= durRequerida) {
-              // Descontar materia prima si este sub-paso consume un insumo
-              if (paso.insumoId && paso.cantidadInsumo > 0) {
-                const invList = [...(nextInventario[negId] || [])];
-                const idxIns = invList.findIndex(ins => ins.id === paso.insumoId);
-                if (idxIns !== -1) {
-                  const ins = { ...invList[idxIns] };
-                  ins.stockActual = Math.max(0, Math.round((ins.stockActual - paso.cantidadInsumo) * 100) / 100);
-                  // Auto-recompra si llega al punto de reorden
-                  if (ins.stockActual <= ins.puntoReorden && state.autoRestockEnabled) {
-                    const costoLote = ins.loteRecompra * ins.costoUnitario;
-                    ins.stockActual = Math.round((ins.stockActual + ins.loteRecompra) * 100) / 100;
-                    nextStats[negId] = {
-                      ...nextStats[negId],
-                      costoInsumosTotales: nextStats[negId].costoInsumosTotales + costoLote
-                    };
-                    pushLog(negId, 'stock', `🔄 Auto-Recompra de [${ins.nombre}] (+${ins.loteRecompra} ${ins.unidad}, -$${costoLote.toFixed(2)}).`);
-                  }
-                  invList[idxIns] = ins;
-                  nextInventario[negId] = invList;
-                }
-              }
-
-              // Actualizar desgaste real de bloque de hielo (1 bloque = 10 raspados)
-              if (paso.codigo === 'INSERT_ICE_BLOCK' && nextEquipos.hp_raspadora) {
-                const maxRasp = nextEquipos.hp_raspadora.maxRaspadosPorBloque || 10;
-                nextEquipos.hp_raspadora = {
-                  ...nextEquipos.hp_raspadora,
-                  raspadosRestantesHielo: maxRasp
-                };
-                pushLog(negId, 'stock', `🧊 Bloque de hielo nuevo cargado en raspadora (${maxRasp}/${maxRasp} raspados).`);
-              } else if (
-                (paso.codigo === 'PUSH_LEVER_SHAVE_ICE' || paso.codigo === 'SHAVE_ICE') &&
-                nextEquipos.hp_raspadora
-              ) {
-                const prevRasp = nextEquipos.hp_raspadora.raspadosRestantesHielo ?? 10;
-                const rem = Math.max(0, prevRasp - 1);
-                nextEquipos.hp_raspadora = {
-                  ...nextEquipos.hp_raspadora,
-                  raspadosRestantesHielo: rem
-                };
-                if (rem === 0) {
-                  pushLog(negId, 'info', '🧊 Bloque de hielo agotado tras 10 raspados; el siguiente cliente requerirá recarga.');
-                }
-              }
-
-              // Detectar si el sub-paso que acaba de concluir es el pago en caja TPV
-              const esPasoPago =
-                paso.waypointCliente === 'caja_tpv_cliente' ||
-                paso.waypointVendedor === 'caja_tpv_vendedor' ||
-                (paso.codigo || '').includes('PAY') ||
-                (paso.codigo || '').includes('CHECKOUT');
-
-              if (esPasoPago && !clienteActivo.pagoEmitido) {
-                const montoPago = parseFloat(clienteActivo.productoDeseado?.precioVenta) || 45;
-                clienteActivo.pagoEmitido = true;
-                nextCashPopups.push({
-                  id: `cash_${realNowMs}_${Math.random().toString(36).slice(2, 7)}`,
-                  negocioId: negId,
-                  monto: montoPago,
-                  createdAtMs: realNowMs
-                });
-              }
-
-              // Pasar al siguiente sub-paso o concluir la venta/atención
-              if (emp.pasoActualIndex + 1 < pasos.length) {
-                emp.pasoActualIndex += 1;
-                emp.pasoElapsedSec = 0;
-
-                // Si aún queda hielo en cámara (> 0 de 10 raspados), omitir recarga e ir directo al botón ON
-                const nextPasoCheck = pasos[emp.pasoActualIndex];
-                if (
-                  nextPasoCheck?.codigo === 'INSERT_ICE_BLOCK' &&
-                  (nextEquipos.hp_raspadora?.raspadosRestantesHielo ?? 10) > 0 &&
-                  emp.pasoActualIndex + 1 < pasos.length
-                ) {
-                  emp.pasoActualIndex += 1;
-                }
-
-                // En Imperia Uniformes: verificar si tras el probador (paso 3) el cliente decide NO comprar
-                if (
-                  negId === 'imperia_uniformes' &&
-                  paso.codigo === 'CLIENT_TRY_DRESSING_ROOM' &&
-                  !clienteActivo.compraraTrasPrueba
-                ) {
-                  nextStats[negId] = {
-                    ...nextStats[negId],
-                    clientesSinCompra: nextStats[negId].clientesSinCompra + 1
-                  };
-                  pushLog(
-                    negId,
-                    'info',
-                    `🚪 ${clienteActivo.nombre} se probó ${clienteActivo.productoDeseado.nombre} en el vestidor pero decidió no comprarlo hoy.`
-                  );
-                  const cliSaliente = cola.shift();
-                  cliSaliente.targetWaypoint = 'acera_exterior';
-                  cliSaliente.tiempoRestanteSeg = 5;
-                  cliSaliente.globoTexto = 'Gracias, regresaré en quincena.';
-                  nextPostCompra[negId] = [...nextPostCompra[negId], cliSaliente];
-                  emp.estado = 'IDLE_TASK';
-                  emp.clienteActualId = null;
-                  emp.recetaActual = null;
-                }
-              } else {
-                // ¡Receta y entrega completada! Registrar ingreso financiero y estadística de producto
-                const prodVendido = clienteActivo.productoDeseado;
-                const precio = parseFloat(prodVendido.precioVenta) || 45;
-                const costoMat = parseFloat(prodVendido.costoMateriales) || 10;
-                const st = nextStats[negId];
-                const prevCount = st.productosVendidosCount[prodVendido.id] || 0;
-
-                if (!clienteActivo.pagoEmitido) {
-                  clienteActivo.pagoEmitido = true;
-                  nextCashPopups.push({
-                    id: `cash_${realNowMs}_${Math.random().toString(36).slice(2, 7)}`,
-                    negocioId: negId,
-                    monto: precio,
-                    createdAtMs: realNowMs
-                  });
-                }
-
-                nextStats[negId] = {
-                  ...st,
-                  ingresosHoy: st.ingresosHoy + precio,
-                  ingresosTotales: st.ingresosTotales + precio,
-                  costoInsumosHoy: (st.costoInsumosHoy || 0) + costoMat,
-                  costoInsumosTotales: st.costoInsumosTotales + costoMat,
-                  ventasHoy: st.ventasHoy + 1,
-                  ventasTotales: st.ventasTotales + 1,
-                  clientesAtendidos: st.clientesAtendidos + 1,
-                  productosVendidosCount: {
-                    ...st.productosVendidosCount,
-                    [prodVendido.id]: prevCount + 1
-                  }
-                };
-
-                // Si Imperia Uniformes levantó un pedido corporativo, enviar orden a Taller de Costura
-                if (prodVendido.id === 'imp_pedido_corporativo_lote' && nextColas.taller_costura.length < 3) {
-                  const ordenTaller = crearEntidadCliente('taller_costura', condiciones, 'tc_filipina_chef');
-                  ordenTaller.nombre = `Orden Interna Imperia (${clienteActivo.nombre})`;
-                  nextColas.taller_costura = [...nextColas.taller_costura, ordenTaller];
-                }
-
-                // Determinar comportamiento post-compra del cliente (Sentarse en mesa, quedarse de pie o salir)
-                const cliTerminado = cola.shift();
-                cliTerminado.tieneProductoEnMano = true;
-
-                let postDestino = 'acera_exterior';
-                let postMsg = 'salió del local con su compra';
-                if (negId === 'hawaiian_paradise') {
-                  if (cliTerminado.decisionPostCompra === 'sentado_mesa') {
-                    postDestino = Math.random() < 0.5 ? 'mesa_1_silla_1' : 'mesa_2_silla_1';
-                    cliTerminado.globoTexto = `😋 Disfrutando ${prodVendido.nombre} en la mesa`;
-                    postMsg = 'se sentó en una mesa a consumir su producto';
-                  } else if (cliTerminado.decisionPostCompra === 'de_pie') {
-                    postDestino = Math.random() < 0.5 ? 'consumo_pie_1' : 'consumo_pie_2';
-                    cliTerminado.globoTexto = `🍧 Consumiendo ${prodVendido.nombre} de pie`;
-                    postMsg = 'se quedó consumiendo su producto de pie';
-                  } else {
-                    postDestino = 'acera_exterior';
-                    cliTerminado.globoTexto = '¡Qué rico raspado!';
-                  }
-                } else {
-                  cliTerminado.globoTexto = '¡Excelente servicio!';
-                }
-
-                cliTerminado.targetWaypoint = postDestino;
-                cliTerminado.tiempoRestanteSeg = cliTerminado.tiempoConsumoPostSeg || 15;
-                nextPostCompra[negId] = [...nextPostCompra[negId], cliTerminado];
-
-                pushLog(
-                  negId,
-                  'sale',
-                  `💰 Venta en ${NEGOCIOS_ZONES_3D[negId].nombre}: ${prodVendido.nombre} (+$${precio.toFixed(2)} MXN) a ${cliTerminado.nombre}, quien ${postMsg}.`
-                );
-
+          if (emp.humanRoutineActual) {
+            const hr = emp.humanRoutineActual;
+            emp.estado = 'RUTINA_HUMANA';
+            emp.textoAccion = hr.texto;
+            emp.animacionActual = hr.animacion || 'WAIT_COOKING';
+            if (moveActorTowardsWaypoint(emp, hr.waypoint, negId)) {
+              emp.humanRoutineElapsedSec += simDeltaSec;
+              if (emp.humanRoutineElapsedSec >= (hr.duracion || 60)) {
+                emp.humanRoutineActual = null;
+                emp.humanRoutineElapsedSec = 0;
                 emp.estado = 'IDLE_TASK';
-                emp.clienteActualId = null;
-                emp.recetaActual = null;
-                emp.itemEnMano = null;
-                emp.pasoCodigoActual = null;
                 emp.animacionActual = null;
-                emp.efectoVisualActual = null;
+              }
+            }
+          } else {
+            const listaTareas = TAREAS_SIN_CLIENTES_POR_NEGOCIO[negId] || TAREAS_SIN_CLIENTES_POR_NEGOCIO.hawaiian_paradise;
+            const tarea = listaTareas[emp.idleTaskIndex % listaTareas.length];
+            emp.textoAccion = tarea.texto;
+            emp.animacionActual = tarea.animacion || null;
+
+            const arrivedIdle = moveActorTowardsWaypoint(emp, tarea.waypoint, negId);
+            if (arrivedIdle) {
+              emp.idleElapsedSec = (emp.idleElapsedSec || 0) + simDeltaSec;
+              if (emp.idleElapsedSec >= (tarea.duracion || 14)) {
+                if (negId === 'imperia_uniformes' && tarea.codigo === 'APP_COTIZACIONES') {
+                  nextCotizaciones = [
+                    { id: `cot_${Date.now()}`, monto: 3850, proveedor: 'Cotexa / Euro / Jasbec', creadaHora: formatTimeHHMMSS(simDate) },
+                    ...nextCotizaciones.slice(0, 8)
+                  ];
+                  pushLog(negId, 'info', '💻 Cotización enviada al Gerente para aprobación antes de reenviar por correo al cliente.');
+                } else if (negId === 'imperia_uniformes' && tarea.codigo === 'MOP_STORE' && (emp.imperiaDaysWorkedCount % 3 === 0)) {
+                  pushLog(negId, 'info', '🪣 Trapeado cada 3 días completado en Imperia Uniformes.');
+                }
+                emp.idleElapsedSec = 0;
+                emp.idleTaskIndex = (emp.idleTaskIndex + 1) % listaTareas.length;
               }
             }
           }
         }
-      } else {
-        // 4. Sin clientes en cola -> Empleado ejecuta sus tareas de mantenimiento/preparación interna
-        emp.estado = 'IDLE_TASK';
-        emp.itemEnMano = null;
-        emp.pasoCodigoActual = null;
-        emp.animacionActual = null;
-        emp.efectoVisualActual = null;
-        const listaTareas = TAREAS_SIN_CLIENTES_POR_NEGOCIO[negId] || TAREAS_SIN_CLIENTES_POR_NEGOCIO.hawaiian_paradise;
-        const tarea = listaTareas[emp.idleTaskIndex % listaTareas.length];
-        emp.textoAccion = tarea.texto;
 
-        const arrivedIdle = moveActorTowardsWaypoint(emp, tarea.waypoint, negId);
-        if (arrivedIdle) {
-          emp.idleElapsedSec += simDeltaSec;
-          if (emp.idleElapsedSec >= (tarea.duracion || 10)) {
-            emp.idleElapsedSec = 0;
-            emp.idleTaskIndex = (emp.idleTaskIndex + 1) % listaTareas.length;
-          }
+        empLista[eIdx] = emp;
+      }
+
+      // 4. Clientes restantes en fila que aún esperan turno
+      let waitSlot = 0;
+      for (let cIdx = 0; cIdx < cola.length; cIdx++) {
+        const cli = cola[cIdx];
+        if (!cli.atendidoPorEmpId) {
+          const wpEspera = waitSlot === 0 ? 'puerta_entrada' : 'acera_exterior';
+          moveActorTowardsWaypoint(cli, wpEspera, negId);
+          cli.globoTexto = `En fila (#${waitSlot + 1}) para ${cli.productoDeseado.nombre}`;
+          waitSlot++;
         }
       }
 
-      // Mover en fila a los clientes en espera (índices 1..N de la cola)
-      for (let cIdx = 1; cIdx < cola.length; cIdx++) {
-        const cliFila = { ...cola[cIdx] };
-        const wpEspera = cIdx === 1 ? 'puerta_entrada' : 'acera_exterior';
-        moveActorTowardsWaypoint(cliFila, wpEspera, negId);
-        cliFila.globoTexto = `En fila (#${cIdx + 1}) para ${cliFila.productoDeseado.nombre}`;
-        cola[cIdx] = cliFila;
-      }
-
-      nextEmpleados[negId] = emp;
+      nextEmpleadosLista[negId] = empLista;
+      nextEmpleados[negId] = empLista[0];
       nextColas[negId] = cola;
     });
 
-    // 5. Integrar el consumo de energía eléctrica (Wh -> kWh) de cada aparato activo en este tick
+    // 5. VISITA FAMILIAR AUTOMÁTICA ENTRE 3:00 PM Y 4:00 PM (Esposa, Alex 12 años y Bárbara 8 años)
+    if (simHour === 15 && nextFamilia.lastVisitDay !== simDate.getDate() && !nextFamilia.visitActive) {
+      const goEatHawaiian = simDate.getDate() % 2 === 0;
+      const targetZ = goEatHawaiian ? 'hawaiian_paradise' : 'oficinas_consorcio';
+      const cZ = ALL_ZONES_3D[targetZ].center;
+      const wps = goEatHawaiian ? ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2'] : ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
+      nextFamilia.visitActive = true;
+      nextFamilia.lastVisitDay = simDate.getDate();
+      nextFamilia.locationZone = targetZ;
+      nextFamilia.activityMode = goEatHawaiian ? 'COMER_HAWAIIAN' : 'OFICINA_TV';
+      nextFamilia.eatingWithManager = goEatHawaiian;
+      nextFamilia.visitEndSimMs = nextSimTimeMs + 90 * 60 * 1000;
+      nextFamilia.miembros = nextFamilia.miembros.map((m, i) => ({
+        ...m,
+        currentZoneId: targetZ,
+        targetWaypoint: wps[i] || 'espera_1',
+        posicionLocal: [0, 0, 4.3],
+        worldPos: [cZ[0], 0, cZ[2] + 4.3],
+        animacionActual: goEatHawaiian ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA',
+        textoAccion: goEatHawaiian ? '🍧 Comiendo en Hawaiian Paradise' : '📺 Viendo tele en el clima de la Oficina'
+      }));
+      pushLog(
+        targetZ,
+        'client',
+        goEatHawaiian
+          ? '👨‍👩‍👧‍👦 3:00 PM — Llegó Esposa con Alex (12) y Bárbara (8) a comer en Hawaiian Paradise!'
+          : '👨‍👩‍👧‍👦 3:00 PM — Esposa trajo a Alex (12) y Bárbara (8) a Oficina Consorcio (TV + Clima A/C).'
+      );
+    }
+
+    if (nextFamilia.visitActive) {
+      if (nextSimTimeMs >= (nextFamilia.visitEndSimMs || 0)) {
+        nextFamilia.visitActive = false;
+        nextFamilia.eatingWithManager = false;
+      } else {
+        const zIdFam = nextFamilia.locationZone || 'oficinas_consorcio';
+        const famWps =
+          zIdFam === 'hawaiian_paradise'
+            ? ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2']
+            : ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
+        nextFamilia.miembros.forEach((m, i) => {
+          const wp = m.targetWaypoint || famWps[i];
+          const arrivedF = moveWorldAgentTowardsTarget(m, zIdFam, wp);
+          if (arrivedF) {
+            m.animacionActual = zIdFam === 'hawaiian_paradise' ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA';
+          }
+        });
+        if (zIdFam === 'oficinas_consorcio') {
+          if (nextEquipos.oc_ac_1tr) nextEquipos.oc_ac_1tr = { ...nextEquipos.oc_ac_1tr, estado: 'WORK', wattsActuales: 1150 };
+          if (nextEquipos.oc_tv_32) nextEquipos.oc_tv_32 = { ...nextEquipos.oc_tv_32, estado: 'WORK', wattsActuales: 55 };
+        }
+      }
+    }
+
+    // 6. MOVIMIENTO Y LABORES DEL GERENTE (Usuario con glow + Plumbob en el mundo 3D)
+    if (nextFamilia.visitActive && nextFamilia.locationZone === 'hawaiian_paradise') {
+      // Si su familia bajó a comer a Hawaiian Paradise -> deja su trabajo y va a sentarse con ellos
+      nextGerente.targetZoneId = 'hawaiian_paradise';
+      nextGerente.targetWaypoint = 'mesa_1_silla_2';
+      nextGerente.isOutsideSupplyRun = false;
+      nextGerente.textoAccion = '👨‍👩‍👧‍👦 Comiendo con Esposa, Alex y Bárbara en Hawaiian Paradise';
+      const satWithFam = moveWorldAgentTowardsTarget(nextGerente, 'hawaiian_paradise', 'mesa_1_silla_2');
+      nextGerente.animacionActual = satWithFam ? 'EAT_AT_TABLE' : null;
+    } else {
+      const targetZ = nextGerente.targetZoneId || 'taller_publi_imperia';
+      const targetW = nextGerente.targetWaypoint || 'eq_pi_pc_diseno';
+      const arrivedMgr = moveWorldAgentTowardsTarget(nextGerente, targetZ, targetW);
+      if (arrivedMgr) {
+        nextGerente.phaseElapsedSec = (nextGerente.phaseElapsedSec || 0) + simDeltaSec;
+        if (targetZ === 'oficinas_consorcio') {
+          if (nextEquipos.oc_ac_1tr) nextEquipos.oc_ac_1tr = { ...nextEquipos.oc_ac_1tr, estado: 'WORK', wattsActuales: 1150 };
+          if (nextEquipos.oc_laptop_diseno) nextEquipos.oc_laptop_diseno = { ...nextEquipos.oc_laptop_diseno, estado: 'WORK', wattsActuales: 65 };
+          nextGerente.animacionActual = 'DESIGN_PC';
+        } else if (targetZ === 'taller_publi_imperia') {
+          nextGerente.animacionActual = targetW.includes('plancha') ? 'IRON_PRESS' : 'DESIGN_PC';
+        } else if (targetZ === 'hawaiian_paradise') {
+          nextGerente.animacionActual = 'IDLE_WAIT';
+        } else {
+          nextGerente.animacionActual = 'OPERATE_TPV';
+        }
+
+        // Rotación automática de actividades si expiró el comando manual
+        if (nextSimTimeMs >= (nextGerente.manualLockUntilSimMs || 0) && nextGerente.phaseElapsedSec >= (nextGerente.phaseDurationSec || 45)) {
+          nextGerente.phaseElapsedSec = 0;
+          const MGR_ROTATION = [
+            { z: 'taller_publi_imperia', wp: 'eq_pi_pc_diseno', dur: 65, txt: '🎨 Gerente: Diseñando vectores en Publi-Impresos (tarea principal)' },
+            { z: 'taller_publi_imperia', wp: 'eq_pi_plancha_plana', dur: 40, txt: '♨️ Gerente: Planchando DTF/Sublimación en Publi-Impresos' },
+            { z: 'imperia_uniformes', wp: 'caja_tpv_vendedor', dur: 35, txt: '📋 Gerente: Aprobando cotizaciones, revisando pedidos y stock Imperia' },
+            { z: 'hawaiian_paradise', wp: 'mesa_1_silla_1', dur: 30, txt: '🍧 Gerente: Preguntando en mesas de Hawaiian si todo está bien' },
+            { z: 'oficinas_consorcio', wp: 'eq_oc_laptop_diseno', dur: 45, txt: '❄️ Gerente: Oficina Consorcio (Clima A/C encendido + diseño PC)' },
+            { z: 'taller_costura', wp: 'raw_mesa_corte_telas', dur: 25, txt: '🧵 Gerente: Llevando tela y supervisando Taller Costura (nunca cose)' },
+            { z: 'papeleria_imperiarte', wp: 'eq_pap_docucolor', dur: 25, txt: '🖨️ Gerente: Imprimiendo en DocuColor y revisando stock Papelería' }
+          ];
+          nextGerente.autoTaskIndex = ((nextGerente.autoTaskIndex || 0) + 1) % MGR_ROTATION.length;
+          const nextR = MGR_ROTATION[nextGerente.autoTaskIndex];
+          nextGerente.targetZoneId = nextR.z;
+          nextGerente.targetWaypoint = nextR.wp;
+          nextGerente.phaseDurationSec = nextR.dur;
+          nextGerente.textoAccion = nextR.txt;
+          nextGerente.isOutsideSupplyRun = false;
+        }
+      } else {
+        nextGerente.animacionActual = null;
+      }
+    }
+
+    // 7. Integrar consumo eléctrico (Wh -> kWh) de cada aparato activo incluyendo Clima/TV/PC de Oficina
     Object.keys(nextEquipos).forEach((eqKey) => {
       const eq = nextEquipos[eqKey];
       const estaEnOperacion = eq.wattsActuales > 0 && (eq.estado === 'WORK' || eq.estado === 'PREHEAT');
-
       if (eq.wattsActuales > 0) {
         const deltaKwh = (eq.wattsActuales * (simDeltaSec / 3600)) / 1000;
         const nextOpSec = estaEnOperacion
@@ -984,7 +1715,6 @@ export const useGameStore = create((set, get) => ({
         const nextOpKwh = estaEnOperacion
           ? ((eq.operacionActiva ? (eq.kwhEnOperacionActual || 0) : 0) + deltaKwh)
           : 0;
-
         nextEquipos[eqKey] = {
           ...eq,
           segundosEncendidoHoy: eq.segundosEncendidoHoy + simDeltaSec,
@@ -1018,7 +1748,15 @@ export const useGameStore = create((set, get) => ({
       ultimoDiaRegistrado: nextUltimoDia,
       ultimoMesRegistrado: nextUltimoMes,
       cashPopups: nextCashPopups,
+      empleadosListaPorNegocio: nextEmpleadosLista,
       empleadosPorNegocio: nextEmpleados,
+      gerenteState: nextGerente,
+      familiaState: nextFamilia,
+      workQueuesPorNegocio: nextWorkQueues,
+      waitingPartsQueuePubli: nextWaitingPubli,
+      pedidosListosImperia: nextPedidosListos,
+      almacenB2BPubli: nextAlmacenB2B,
+      cotizacionesPendientesGerente: nextCotizaciones,
       clientesColaPorNegocio: nextColas,
       clientesPostCompraPorNegocio: nextPostCompra,
       spawnAccumulators: nextSpawnAcc,

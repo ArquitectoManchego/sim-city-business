@@ -10,6 +10,7 @@ import KPIsAndEnergyModal from './components/hud/KPIsAndEnergyModal.jsx';
 import CFEReceiptModal from './components/hud/CFEReceiptModal.jsx';
 import InventoryStockDrawer from './components/hud/InventoryStockDrawer.jsx';
 import MarketingCampaignModal from './components/hud/MarketingCampaignModal.jsx';
+import Sims2CASModal from './components/hud/Sims2CASModal.jsx';
 import TrainingModeOverlay from './components/training/TrainingModeOverlay.jsx';
 import SketchUpImporterModal from './components/editor/SketchUpImporterModal.jsx';
 import CollisionAndLayerTool from './components/editor/CollisionAndLayerTool.jsx';
@@ -232,6 +233,7 @@ export default function App() {
         <CFEReceiptModal />
         <InventoryStockDrawer />
         <MarketingCampaignModal />
+        <Sims2CASModal />
       </div>
     </AppErrorBoundary>
   );

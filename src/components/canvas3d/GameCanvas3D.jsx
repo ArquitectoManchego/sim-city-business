@@ -10,6 +10,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
 import {
   NEGOCIOS_ZONES_3D,
+  ALL_ZONES_3D,
   WAYPOINTS_POR_NEGOCIO
 } from '../../engine/ChoreographyRegistry.js';
 import { isLocalPointBlocked } from '../../engine/NavMeshGrid.js';
@@ -22,6 +23,14 @@ import {
   updateApplianceVisualState,
   updateHandItemVisual
 } from './EquipmentModels3D.js';
+import {
+  preloadSims2Assets,
+  createDefaultSims2Profiles,
+  buildCustomerSims2Profile,
+  createSims2ActorGroup,
+  syncSims2ActorProfile,
+  animateSims2Actor
+} from './Sims2AvatarLoader.js';
 
 const APPLIANCE_SHORT_NAMES = {
   hp_raspadora: 'Raspadora Hielo',
@@ -54,7 +63,10 @@ const APPLIANCE_SHORT_NAMES = {
   pi_epson: 'Epson Sublimación',
   pi_plancha_tazas: 'Plancha Tazas',
   pi_plancha_plana: 'Plancha Plana',
-  pi_atomstack: 'Láser Atomstack'
+  pi_atomstack: 'Láser Atomstack',
+  oc_ac_1tr: 'Clima Oficina 1TR',
+  oc_tv_32: 'Smart TV 32"',
+  oc_laptop_diseno: 'Laptop Diseño PC'
 };
 
 function formatOpDuration(totalSeconds) {
@@ -89,146 +101,181 @@ function lerpAngle(current, target, alpha) {
 }
 
 /**
- * Construye una figura humanoide 3D estilizada con pivotes en hombros para Empleado o Cliente
+ * Construye estanterías de exhibición para las 6 ramas de Imperia Uniformes, rack de pedidos listos y mostrador de maniquíes
  */
-function createHumanoidActorMesh(shirtColorHex = '#10b981', isEmployee = false) {
-  const group = new THREE.Group();
+function buildImperiaFixtures3D(localGroup, wps) {
+  const frameMat = new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.72, roughness: 0.28 });
+  const darkMetal = new THREE.MeshStandardMaterial({ color: '#1e293b', metalness: 0.5, roughness: 0.45 });
 
-  // Piernas
-  const legGeo = new THREE.CylinderGeometry(0.08, 0.07, 0.55, 10);
-  const legMat = new THREE.MeshStandardMaterial({ color: '#1e293b', roughness: 0.7 });
-  const leftLeg = new THREE.Mesh(legGeo, legMat);
-  leftLeg.position.set(-0.11, 0.275, 0);
-  leftLeg.castShadow = true;
-  const rightLeg = new THREE.Mesh(legGeo, legMat);
-  rightLeg.position.set(0.11, 0.275, 0);
-  rightLeg.castShadow = true;
-  group.add(leftLeg, rightLeg);
+  const branchSpecs = [
+    { key: 'rack_gastronomia', color: '#f8fafc', accent: '#ef4444' },
+    { key: 'rack_enfermeria', color: '#14b8a6', accent: '#ccfbf1' },
+    { key: 'rack_medicina', color: '#38bdf8', accent: '#f8fafc' },
+    { key: 'rack_escolares', color: '#eab308', accent: '#1e3a8a' },
+    { key: 'rack_industriales', color: '#f97316', accent: '#0f172a' },
+    { key: 'rack_proveedores', color: '#a855f7', accent: '#e2e8f0' }
+  ];
 
-  // Torso
-  const torsoGeo = new THREE.CylinderGeometry(0.22, 0.18, 0.62, 12);
-  const torsoMat = new THREE.MeshStandardMaterial({ color: shirtColorHex, roughness: 0.45 });
-  const torso = new THREE.Mesh(torsoGeo, torsoMat);
-  torso.position.set(0, 0.85, 0);
-  torso.castShadow = true;
-  group.add(torso);
+  // Fallbacks alineados con IMPERIA_BRANCH_RACKS por si algún waypoint cambia
+  const fallbackX = [-4.4, -2.65, -0.9, 0.9, 2.65, 4.4];
+  branchSpecs.forEach((spec, idx) => {
+    const wp = wps[spec.key] || [fallbackX[idx], 0, -3.15];
+    const rack = new THREE.Group();
+    rack.name = `fixture_${spec.key}`;
+    rack.position.set(wp[0], 0, -4.12);
 
-  // Mandil si es empleado
-  if (isEmployee) {
-    const apronGeo = new THREE.BoxGeometry(0.32, 0.52, 0.12);
-    const apronMat = new THREE.MeshStandardMaterial({ color: '#0f172a', roughness: 0.5 });
-    const apron = new THREE.Mesh(apronGeo, apronMat);
-    apron.position.set(0, 0.80, 0.14);
-    group.add(apron);
+    const base = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.08, 0.50), darkMetal);
+    base.position.y = 0.04;
+    base.castShadow = true;
+    rack.add(base);
+
+    [-0.65, 0.65].forEach((px) => {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.92, 8), frameMat);
+      post.position.set(px, 0.96, 0);
+      post.castShadow = true;
+      rack.add(post);
+    });
+
+    const rail = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.36, 8), frameMat);
+    rail.rotation.z = Math.PI / 2;
+    rail.position.set(0, 1.62, 0.05);
+    rack.add(rail);
+
+    const headerBar = new THREE.Mesh(
+      new THREE.BoxGeometry(1.42, 0.16, 0.14),
+      new THREE.MeshStandardMaterial({ color: spec.accent, emissive: spec.color, emissiveIntensity: 0.18 })
+    );
+    headerBar.position.set(0, 1.98, 0.08);
+    rack.add(headerBar);
+
+    const garmentMat = new THREE.MeshStandardMaterial({ color: spec.color, roughness: 0.65 });
+    for (let gIdx = -2; gIdx <= 2; gIdx++) {
+      const garment = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.72, 0.28), garmentMat);
+      garment.position.set(gIdx * 0.23, 1.20, 0.05);
+      garment.castShadow = true;
+      rack.add(garment);
+    }
+
+    localGroup.add(rack);
+  });
+
+  // Rack de Pedidos Listos (recibidos de Bordados Veracruz y Taller Costura)
+  if (wps.rack_pedidos_listos) {
+    const readyRack = new THREE.Group();
+    readyRack.name = 'fixture_rack_pedidos_listos';
+    readyRack.position.set(wps.rack_pedidos_listos[0] + 0.55, 0, wps.rack_pedidos_listos[2]);
+    const rBase = new THREE.Mesh(new THREE.BoxGeometry(0.55, 0.08, 1.25), darkMetal);
+    rBase.position.y = 0.04;
+    readyRack.add(rBase);
+    [-0.55, 0.55].forEach((pz) => {
+      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.024, 0.024, 1.75, 8), frameMat);
+      p.position.set(0, 0.875, pz);
+      readyRack.add(p);
+    });
+    const rBar = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 1.15, 8), frameMat);
+    rBar.rotation.x = Math.PI / 2;
+    rBar.position.set(0, 1.65, 0);
+    readyRack.add(rBar);
+    const bagMat = new THREE.MeshStandardMaterial({ color: '#bae6fd', transparent: true, opacity: 0.75 });
+    for (let bIdx = -1; bIdx <= 1; bIdx++) {
+      const bag = new THREE.Mesh(new THREE.BoxGeometry(0.32, 0.78, 0.22), bagMat);
+      bag.position.set(0, 1.22, bIdx * 0.34);
+      readyRack.add(bag);
+    }
+    localGroup.add(readyRack);
   }
 
-  // Cabeza
-  const headGeo = new THREE.SphereGeometry(0.21, 16, 16);
-  const headMat = new THREE.MeshStandardMaterial({ color: '#fde68a', roughness: 0.4 });
-  const head = new THREE.Mesh(headGeo, headMat);
-  head.position.set(0, 1.38, 0);
-  head.castShadow = true;
-  group.add(head);
-
-  // Gorra si es empleado
-  if (isEmployee) {
-    const capGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.10, 14);
-    const capMat = new THREE.MeshStandardMaterial({ color: shirtColorHex, roughness: 0.4 });
-    const cap = new THREE.Mesh(capGeo, capMat);
-    cap.position.set(0, 1.52, 0);
-    group.add(cap);
+  // Exhibidores de uniformes en la entrada (área de maniquíes) sin geometrías humanoides primitivas
+  if (wps.area_maniquies_entrada) {
+    const standPos = [
+      [wps.area_maniquies_entrada[0] - 0.35, wps.area_maniquies_entrada[2] - 0.55],
+      [wps.area_maniquies_entrada[0] + 0.35, wps.area_maniquies_entrada[2] - 0.55]
+    ];
+    standPos.forEach(([sx, sz], idx) => {
+      const plinth = new THREE.Group();
+      plinth.position.set(sx, 0, sz);
+      const base = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.28, 0.46), darkMetal);
+      base.position.y = 0.14;
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 1.35, 8), frameMat);
+      pole.position.y = 0.92;
+      const formMat = new THREE.MeshStandardMaterial({ color: idx === 0 ? '#0ea5e9' : '#ec4899', roughness: 0.55 });
+      const tunic = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.62, 0.20), formMat);
+      tunic.position.y = 1.22;
+      tunic.castShadow = true;
+      plinth.add(base, pole, tunic);
+      localGroup.add(plinth);
+    });
   }
 
-  // Brazos articulados desde pivote de hombro para gestos de cocina/taller
-  const armGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.48, 8);
-  const armMat = new THREE.MeshStandardMaterial({ color: shirtColorHex, roughness: 0.5 });
-
-  const leftArmPivot = new THREE.Group();
-  leftArmPivot.name = 'leftArmPivot';
-  leftArmPivot.position.set(-0.28, 1.08, 0);
-  const leftArm = new THREE.Mesh(armGeo, armMat);
-  leftArm.position.set(0, -0.20, 0.06);
-  leftArm.rotation.x = -0.35;
-  leftArmPivot.add(leftArm);
-
-  const rightArmPivot = new THREE.Group();
-  rightArmPivot.name = 'rightArmPivot';
-  rightArmPivot.position.set(0.28, 1.08, 0);
-  const rightArm = new THREE.Mesh(armGeo, armMat);
-  rightArm.position.set(0, -0.20, 0.06);
-  rightArm.rotation.x = -0.35;
-  rightArmPivot.add(rightArm);
-
-  group.add(leftArmPivot, rightArmPivot);
-
-  // Contenedor de objeto en manos (bowl, rastrillo, espátula, plato, hielo, vaso, etc.)
-  const handItemGroup = new THREE.Group();
-  handItemGroup.position.set(0, 0.92, 0.36);
-  handItemGroup.name = 'handItemGroup';
-  group.add(handItemGroup);
-
-  return group;
+  // Cortinas en el módulo de probadores
+  if (wps.probador_1) {
+    const curtainMat = new THREE.MeshStandardMaterial({ color: '#64748b', roughness: 0.85, side: THREE.DoubleSide });
+    const curtain = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.05), curtainMat);
+    curtain.rotation.y = Math.PI / 2;
+    curtain.position.set(-4.48, 1.05, 2.9);
+    localGroup.add(curtain);
+  }
 }
 
 /**
- * Articula brazos y orientación de manos de acuerdo al tipo de operación paso a paso
+ * Construye estiba con cajas empacadas B2B en el almacén de Publi-Impresos
  */
-function applyEmployeeGestureAnimation(empMesh, animType, isMoving, nowSec) {
-  const leftPivot = empMesh.getObjectByName('leftArmPivot');
-  const rightPivot = empMesh.getObjectByName('rightArmPivot');
-  const handGroup = empMesh.getObjectByName('handItemGroup');
-  if (!leftPivot || !rightPivot) return;
+function buildB2BWarehouseBoxes3D(localGroup, wp) {
+  if (!wp) return;
+  const g = new THREE.Group();
+  g.name = 'fixture_almacen_b2b';
+  g.position.set(wp[0] + 0.45, 0, wp[2] + 0.45);
+  const pallet = new THREE.Mesh(
+    new THREE.BoxGeometry(1.15, 0.12, 1.05),
+    new THREE.MeshStandardMaterial({ color: '#92400e', roughness: 0.85 })
+  );
+  pallet.position.y = 0.06;
+  g.add(pallet);
 
-  if (isMoving) {
-    const swing = Math.sin(nowSec * 10.0) * 0.45;
-    leftPivot.rotation.set(swing, 0, 0);
-    rightPivot.rotation.set(-swing, 0, 0);
-    if (handGroup) handGroup.position.set(0, 0.92, 0.36);
-    return;
-  }
+  const boxMat = new THREE.MeshStandardMaterial({ color: '#d97706', roughness: 0.78 });
+  const tapeMat = new THREE.MeshStandardMaterial({ color: '#fde68a', roughness: 0.4 });
+  const layout = [
+    [-0.26, 0.34, -0.22],
+    [0.24, 0.34, -0.22],
+    [-0.24, 0.34, 0.24],
+    [0.24, 0.34, 0.24],
+    [-0.12, 0.76, -0.02],
+    [0.22, 0.76, 0.08]
+  ];
+  layout.forEach(([bx, by, bz]) => {
+    const box = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.38, 0.40), boxMat);
+    box.position.set(bx, by, bz);
+    box.castShadow = true;
+    box.receiveShadow = true;
+    const label = new THREE.Mesh(new THREE.BoxGeometry(0.43, 0.05, 0.08), tapeMat);
+    label.position.y = 0.08;
+    box.add(label);
+    g.add(box);
+  });
+  localGroup.add(g);
+}
 
-  leftPivot.rotation.set(0, 0, 0);
-  rightPivot.rotation.set(0, 0, 0);
-  if (handGroup) handGroup.position.set(0, 0.92, 0.36);
-
-  if (animType === 'POUR_BATTER') {
-    rightPivot.rotation.set(-1.12, 0, -0.15);
-    leftPivot.rotation.set(-0.65, 0, 0.12);
-    if (handGroup) handGroup.position.set(0, 1.04 + Math.sin(nowSec * 4) * 0.02, 0.46);
-  } else if (animType === 'CIRCULAR_RAKE') {
-    rightPivot.rotation.set(-1.0 + Math.cos(nowSec * 5.2) * 0.18, 0, Math.sin(nowSec * 5.2) * 0.28);
-    leftPivot.rotation.set(-0.45, 0, 0);
-    if (handGroup) {
-      handGroup.position.set(Math.sin(nowSec * 5.2) * 0.12, 0.98, 0.46 + Math.cos(nowSec * 5.2) * 0.08);
-    }
-  } else if (animType === 'SPREAD_INGREDIENTS') {
-    rightPivot.rotation.set(-0.98, 0, Math.sin(nowSec * 6.5) * 0.35);
-    leftPivot.rotation.set(-0.82, 0, 0.15);
-    if (handGroup) handGroup.position.set(Math.sin(nowSec * 6.5) * 0.10, 0.98, 0.44);
-  } else if (animType === 'FOLD_CREPA') {
-    leftPivot.rotation.set(-0.95, 0, 0.18);
-    rightPivot.rotation.set(-1.0 + Math.sin(nowSec * 5.0) * 0.25, 0, -0.18);
-    if (handGroup) handGroup.position.set(0, 1.00, 0.44);
-  } else if (animType === 'WAIT_HEATING' || animType === 'WAIT_COOKING') {
-    leftPivot.rotation.set(-0.3, 0, 0);
-    rightPivot.rotation.set(-0.72 + Math.sin(nowSec * 2.2) * 0.08, 0, 0);
-  } else if (animType === 'CARRY_BOWL' || animType === 'CARRY_PLATE') {
-    leftPivot.rotation.set(-0.82, 0, 0.14);
-    rightPivot.rotation.set(-0.82, 0, -0.14);
-    if (handGroup) handGroup.position.set(0, 0.96, 0.42);
-  } else if (animType === 'CRANK_LEFT_HANDLE') {
-    leftPivot.rotation.set(-1.12 + Math.sin(nowSec * 7.5) * 0.42, 0, -0.22 + Math.cos(nowSec * 7.5) * 0.25);
-    rightPivot.rotation.set(-0.58, 0, -0.10);
-  } else if (animType === 'PRESS_RIGHT_SWITCH') {
-    leftPivot.rotation.set(-0.25, 0, 0);
-    rightPivot.rotation.set(-1.05 + Math.sin(nowSec * 6.0) * 0.12, 0, -0.22);
-  } else if (animType === 'OPERATE_TPV') {
-    leftPivot.rotation.set(-0.25, 0, 0);
-    rightPivot.rotation.set(-0.95 + Math.sin(nowSec * 9.0) * 0.15, 0, 0);
-  } else if (animType === 'TALK_CLIENT') {
-    leftPivot.rotation.set(-0.25, 0, 0);
-    rightPivot.rotation.set(-0.45 + Math.sin(nowSec * 4.5) * 0.22, 0, 0);
-  }
+/**
+ * Señalización y mampara sutil de Baño de Empleado junto al waypoint bano_empleado
+ */
+function buildRestroomPartition3D(localGroup, wp, zoneSize) {
+  if (!wp) return;
+  const [w] = zoneSize;
+  const sideSign = wp[0] >= 0 ? 1 : -1;
+  const clampedX = Math.max(-w / 2 + 0.35, Math.min(w / 2 - 0.35, wp[0] + sideSign * 0.42));
+  const grp = new THREE.Group();
+  grp.position.set(clampedX, 0, wp[2]);
+  const doorMat = new THREE.MeshStandardMaterial({ color: '#475569', roughness: 0.4 });
+  const door = new THREE.Mesh(new THREE.BoxGeometry(0.14, 2.05, 0.92), doorMat);
+  door.position.y = 1.025;
+  door.castShadow = true;
+  const wcSign = new THREE.Mesh(
+    new THREE.BoxGeometry(0.16, 0.22, 0.34),
+    new THREE.MeshBasicMaterial({ color: '#0ea5e9' })
+  );
+  wcSign.position.set(0, 1.72, 0);
+  grp.add(door, wcSign);
+  localGroup.add(grp);
 }
 
 export default function GameCanvas3D() {
@@ -236,7 +283,8 @@ export default function GameCanvas3D() {
   const sceneRef = useRef(null);
   const cameraRef = useRef(null);
   const controlsRef = useRef(null);
-  const actorGroupsRef = useRef({ employees: {}, customers: {} });
+  const actorGroupsRef = useRef({ employees: {}, customers: {}, gerente: null, familia: {} });
+  const defaultSims2Ref = useRef(createDefaultSims2Profiles());
   const machineGroupsRef = useRef({});
   const meterDiscsRef = useRef({});
   const collisionGroupRef = useRef(null);
@@ -277,6 +325,9 @@ export default function GameCanvas3D() {
     scene.fog = new THREE.FogExp2('#060a12', 0.012);
     sceneRef.current = scene;
 
+    // Precargar modelos GLB 3D reales estilo Sims 2 al montar el lienzo
+    preloadSims2Assets();
+
     const camera = new THREE.PerspectiveCamera(
       45,
       container.clientWidth / Math.max(1, container.clientHeight),
@@ -291,6 +342,7 @@ export default function GameCanvas3D() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     container.innerHTML = '';
     container.appendChild(renderer.domElement);
 
@@ -306,9 +358,10 @@ export default function GameCanvas3D() {
     });
     controlsRef.current = controls;
 
-    // Iluminación Ambiental y Sol Direccional
-    const ambientLight = new THREE.AmbientLight('#e2e8f0', 1.15);
+    // Iluminación Ambiental, Hemisférica PBR y Sol Direccional
+    const ambientLight = new THREE.AmbientLight('#e2e8f0', 1.1);
     scene.add(ambientLight);
+    scene.add(new THREE.HemisphereLight('#f1f5f9', '#0f172a', 0.65));
 
     const dirLight = new THREE.DirectionalLight('#fffbeb', 1.65);
     dirLight.position.set(18, 32, 22);
@@ -326,7 +379,7 @@ export default function GameCanvas3D() {
 
     // Plataforma Urbana General y Acera Peatonal
     const groundSlab = new THREE.Mesh(
-      new THREE.PlaneGeometry(75, 55),
+      new THREE.PlaneGeometry(82, 58),
       new THREE.MeshStandardMaterial({ color: '#090f1d', roughness: 0.92 })
     );
     groundSlab.rotation.x = -Math.PI / 2;
@@ -334,14 +387,14 @@ export default function GameCanvas3D() {
     groundSlab.receiveShadow = true;
     scene.add(groundSlab);
 
-    const gridHelper = new THREE.GridHelper(70, 70, '#1e293b', '#0f172a');
+    const gridHelper = new THREE.GridHelper(78, 78, '#1e293b', '#0f172a');
     gridHelper.position.y = -0.02;
     scene.add(gridHelper);
 
-    // Construir cada uno de los 6 Locales Comerciales y sus máquinas/insumos 3D
+    // Construir cada uno de los 6 Locales Comerciales + Oficina Consorcio y sus máquinas/insumos 3D
     const wallsList = [];
-    NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
-      const zone = NEGOCIOS_ZONES_3D[negId];
+    Object.keys(ALL_ZONES_3D).forEach((negId) => {
+      const zone = ALL_ZONES_3D[negId];
       const [cx, , cz] = zone.center;
       const [w, h, depth] = zone.size;
       const localGroup = new THREE.Group();
@@ -445,20 +498,29 @@ export default function GameCanvas3D() {
         }
       }
 
-      // Minisplit Inverter montado en muro trasero de cada local con clima
+      // Minisplit Inverter montado en muro trasero de cada local y Oficina con clima
       const acKeyMap = {
         hawaiian_paradise: 'hp_ac_clientes',
         imperia_uniformes: 'imp_ac',
         papeleria_imperiarte: 'pap_ac_18k',
         bordados_veracruz: 'bv_ac',
-        taller_costura: 'tc_ac'
+        taller_costura: 'tc_ac',
+        oficinas_consorcio: 'oc_ac_1tr'
       };
       if (acKeyMap[negId]) {
         spawnMachine(acKeyMap[negId], [0, 2.55, -depth / 2 + 0.30]);
       }
 
-      if (negId === 'imperia_uniformes' && wps.caja_tpv_vendedor) {
-        spawnMachine('imp_terminal', [wps.caja_tpv_vendedor[0] - 0.50, 1.0, 0.14]);
+      // Baño de empleado en cada local y Oficina Consorcio
+      if (wps.bano_empleado) {
+        buildRestroomPartition3D(localGroup, wps.bano_empleado, zone.size);
+      }
+
+      if (negId === 'imperia_uniformes') {
+        if (wps.caja_tpv_vendedor) {
+          spawnMachine('imp_terminal', [wps.caja_tpv_vendedor[0] - 0.50, 1.0, 0.14]);
+        }
+        buildImperiaFixtures3D(localGroup, wps);
       }
 
       if (negId === 'hawaiian_paradise') {
@@ -541,13 +603,19 @@ export default function GameCanvas3D() {
         spawnMachine('pi_plancha_tazas', [wps.eq_pi_plancha_tazas[0], 0, wps.eq_pi_plancha_tazas[2] - 0.7]);
         spawnMachine('pi_plancha_plana', [wps.eq_pi_plancha_plana[0], 0, wps.eq_pi_plancha_plana[2] - 0.7]);
         spawnMachine('pi_atomstack', [wps.eq_pi_atomstack[0], 0, wps.eq_pi_atomstack[2] - 0.7]);
+        if (wps.raw_almacen_b2b) {
+          buildB2BWarehouseBoxes3D(localGroup, wps.raw_almacen_b2b);
+        }
       }
 
-      // Crear el Empleado 3D del negocio
-      const empMesh = createHumanoidActorMesh(zone.colorHex, true);
-      empMesh.position.set(cx, 0, cz - 0.7);
-      scene.add(empMesh);
-      actorGroupsRef.current.employees[negId] = empMesh;
+      if (negId === 'oficinas_consorcio') {
+        if (wps.eq_oc_laptop_diseno) {
+          spawnMachine('oc_laptop_diseno', [wps.eq_oc_laptop_diseno[0], 0, wps.eq_oc_laptop_diseno[2] - 0.68]);
+        }
+        if (wps.eq_oc_tv_32) {
+          spawnMachine('oc_tv_32', [wps.eq_oc_tv_32[0], 0, wps.eq_oc_tv_32[2] - 0.35]);
+        }
+      }
     });
 
     // PARED DE MEDIDORES DE LUZ CFE 3D (Muro de Acometida en X = -23, Z = 1)
@@ -619,8 +687,8 @@ export default function GameCanvas3D() {
       if (raycaster.ray.intersectPlane(plane, hitPoint)) {
         // Determinar en qué negocio cayó el clic
         const negFocus = useGameStore.getState().focusedNegocioId;
-        const targetNegId = NEGOCIOS_ZONES_3D[negFocus] ? negFocus : 'hawaiian_paradise';
-        const zone = NEGOCIOS_ZONES_3D[targetNegId];
+        const targetNegId = ALL_ZONES_3D[negFocus] ? negFocus : 'hawaiian_paradise';
+        const zone = ALL_ZONES_3D[targetNegId];
         const localX = Math.round((hitPoint.x - zone.center[0]) * 10) / 10;
         const localZ = Math.round((hitPoint.z - zone.center[2]) * 10) / 10;
         if (Math.abs(localX) <= zone.size[0] / 2 && Math.abs(localZ) <= zone.size[2] / 2) {
@@ -696,12 +764,17 @@ export default function GameCanvas3D() {
             isActive = false;
           }
         } else {
-          const empNeg = freshGame.empleadosPorNegocio[eqRuntime.negocioId];
-          if (empNeg && empNeg.estado === 'ATENDIENDO_CLIENTE' && empNeg.recetaActual) {
-            const empStep = empNeg.recetaActual.pasos?.[empNeg.pasoActualIndex];
-            if (empStep?.equipoKey === eqKey) {
-              stepCodigo = empStep.codigo || null;
-              stepProgress = Math.min(1, empNeg.pasoElapsedSec / Math.max(1, empStep.duracionSegundos || 4));
+          const empListaNeg =
+            freshGame.empleadosListaPorNegocio?.[eqRuntime.negocioId] ||
+            (freshGame.empleadosPorNegocio?.[eqRuntime.negocioId] ? [freshGame.empleadosPorNegocio[eqRuntime.negocioId]] : []);
+          for (const empNeg of empListaNeg) {
+            if ((empNeg?.estado === 'ATENDIENDO_CLIENTE' || empNeg?.estado === 'ATENDIENDO_QUEUE') && empNeg.recetaActual) {
+              const empStep = empNeg.recetaActual.pasos?.[empNeg.pasoActualIndex];
+              if (empStep?.equipoKey === eqKey) {
+                stepCodigo = empStep.codigo || null;
+                stepProgress = Math.min(1, empNeg.pasoElapsedSec / Math.max(1, empStep.duracionSegundos || 4));
+                break;
+              }
             }
           }
         }
@@ -729,30 +802,61 @@ export default function GameCanvas3D() {
         disc.rotation.y += (wattsMedidor / 1000) * dt * 2.5;
       });
 
-      // Actualizar posiciones 3D, orientación y gestos articulados de Empleados y Clientes
+      // Actualizar posiciones 3D, avatares GLB Sims 2, esqueleto de 67 huesos e ítems de mano
+      const activeEmployeeIds = new Set();
       const activeCustomerIds = new Set();
+      const activeFamiliaIds = new Set();
       const tmpMachineWorldPos = new THREE.Vector3();
+      const sims2ConfigMap = freshGame.sims2AvataresConfig || {};
+      const defaultProfiles = defaultSims2Ref.current;
 
       NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
-        const zone = NEGOCIOS_ZONES_3D[negId];
+        const zone = ALL_ZONES_3D[negId];
+        if (!zone) return;
         const [cx, , cz] = zone.center;
-        const empMesh = actorGroupsRef.current.employees[negId];
-        const empData = freshGame.empleadosPorNegocio[negId];
+        const empLista =
+          freshGame.empleadosListaPorNegocio?.[negId] ||
+          (freshGame.empleadosPorNegocio?.[negId] ? [freshGame.empleadosPorNegocio[negId]] : []);
 
-        if (empMesh && empData) {
-          let targetLx = empData.posicionLocal[0];
-          let targetLz = empData.posicionLocal[2];
+        empLista.forEach((empData, empIdx) => {
+          if (!empData) return;
+          activeEmployeeIds.add(empData.id);
+          const sims2Id = empData.sims2Id || `emp_${negId}_${empIdx + 1}`;
+          const empProfile = sims2ConfigMap[sims2Id] ||
+            defaultProfiles[sims2Id] || {
+              ...defaultProfiles.gerente,
+              id: sims2Id,
+              isManager: false,
+              showAura: false,
+              showPlumbob: false,
+              topColor: zone.colorHex
+            };
+
+          let empMesh = actorGroupsRef.current.employees[empData.id];
+          if (!empMesh) {
+            empMesh = createSims2ActorGroup(empProfile);
+            empMesh.position.set(cx + (empData.posicionLocal?.[0] || 0), 0, cz + (empData.posicionLocal?.[2] || -0.7));
+            empMesh.userData._profileRef = empProfile;
+            scene.add(empMesh);
+            actorGroupsRef.current.employees[empData.id] = empMesh;
+          } else if (empMesh.userData._profileRef !== empProfile) {
+            syncSims2ActorProfile(empMesh, empProfile);
+            empMesh.userData._profileRef = empProfile;
+          }
+
+          let targetLx = empData.posicionLocal?.[0] || 0;
+          let targetLz = empData.posicionLocal?.[2] || 0;
           let handItem = empData.itemEnMano;
           let animType = empData.animacionActual || null;
           let targetMachineKey = null;
 
-          if (empData.estado === 'ATENDIENDO_CLIENTE' && empData.recetaActual) {
+          if ((empData.estado === 'ATENDIENDO_CLIENTE' || empData.estado === 'ATENDIENDO_QUEUE') && empData.recetaActual) {
             const activeStep = empData.recetaActual.pasos?.[empData.pasoActualIndex];
             targetMachineKey = activeStep?.equipoKey || null;
           }
 
-          // Si está activo el Modo Entrenamiento en este negocio, posicionar al empleado en el waypoint del paso entrenado
-          if (freshTrain.isTrainingMode && freshTrain.selectedNegocioId === negId) {
+          // Modo Entrenamiento sobre el empleado titular (empIdx === 0)
+          if (empIdx === 0 && freshTrain.isTrainingMode && freshTrain.selectedNegocioId === negId) {
             const rec = freshTrain.recetasEntrenadas[freshTrain.selectedProductId];
             const curStep = rec?.pasos?.[freshTrain.activeStepIndex];
             const wps = WAYPOINTS_POR_NEGOCIO[negId] || {};
@@ -768,12 +872,11 @@ export default function GameCanvas3D() {
           const destZ = cz + targetLz;
           const dx = destX - empMesh.position.x;
           const dz = destZ - empMesh.position.z;
-          const distToTarget = Math.hypot(dx, dz);
-          const isMoving = distToTarget > 0.08;
+          const isMoving = Math.hypot(dx, dz) > 0.08;
 
           empMesh.position.x += dx * 0.22;
           empMesh.position.z += dz * 0.22;
-          empMesh.position.y = isMoving ? Math.abs(Math.sin(nowSec * 9.0)) * 0.045 : 0;
+          empMesh.position.y = 0;
 
           if (isMoving) {
             empMesh.rotation.y = lerpAngle(empMesh.rotation.y, Math.atan2(dx, dz), 0.25);
@@ -788,12 +891,13 @@ export default function GameCanvas3D() {
             empMesh.rotation.y = lerpAngle(empMesh.rotation.y, 0, 0.16);
           }
 
-          applyEmployeeGestureAnimation(empMesh, animType, isMoving, nowSec);
-          const handGroup = empMesh.getObjectByName('handItemGroup');
-          updateHandItemVisual(handGroup, handItem);
-        }
+          animateSims2Actor(empMesh, animType, isMoving, nowSec);
+          if (empMesh.userData.rightHandSocket) {
+            updateHandItemVisual(empMesh.userData.rightHandSocket, handItem);
+          }
+        });
 
-        // Clientes en cola y clientes post-compra de este negocio
+        // Clientes en cola y clientes post-compra de este negocio con avatares GLB Sims 2
         const allClients = [
           ...(freshGame.clientesColaPorNegocio[negId] || []),
           ...(freshGame.clientesPostCompraPorNegocio[negId] || [])
@@ -803,7 +907,8 @@ export default function GameCanvas3D() {
           activeCustomerIds.add(cli.id);
           let cliMesh = actorGroupsRef.current.customers[cli.id];
           if (!cliMesh) {
-            cliMesh = createHumanoidActorMesh(cli.colorCamisa || '#38bdf8', false);
+            const cliProfile = buildCustomerSims2Profile(cli.id, cli.colorCamisa || '#38bdf8');
+            cliMesh = createSims2ActorGroup(cliProfile);
             cliMesh.position.set(cx + cli.posicionLocal[0], 0, cz + cli.posicionLocal[2]);
             scene.add(cliMesh);
             actorGroupsRef.current.customers[cli.id] = cliMesh;
@@ -813,11 +918,16 @@ export default function GameCanvas3D() {
           const cliMoving = Math.hypot(cdx, cdz) > 0.08;
           cliMesh.position.x += cdx * 0.22;
           cliMesh.position.z += cdz * 0.22;
+          cliMesh.position.y = 0;
+
           if (cliMoving) {
             cliMesh.rotation.y = lerpAngle(cliMesh.rotation.y, Math.atan2(cdx, cdz), 0.24);
           } else {
             cliMesh.rotation.y = lerpAngle(cliMesh.rotation.y, Math.PI, 0.16);
           }
+
+          const isSeatedCli = !cliMoving && (cli.decisionPostCompra === 'sentado_mesa' || cli.targetWaypoint?.startsWith('mesa_'));
+          animateSims2Actor(cliMesh, isSeatedCli ? 'EAT_AT_TABLE' : null, cliMoving, nowSec);
 
           let cliHandItem = null;
           if (cli.tieneProductoEnMano) {
@@ -826,17 +936,127 @@ export default function GameCanvas3D() {
             else if (pId === 'hp_espresso_americano' || pId === 'hp_cappuccino_latte') cliHandItem = 'espresso_cup';
             else if (pId === 'pi_sub_tazas') cliHandItem = 'sublimation_mug';
             else if (pId === 'pap_impresion_color') cliHandItem = 'paper_stack';
+            else if (pId.startsWith('imp_') || pId.startsWith('uni_') || pId.startsWith('bv_') || pId.startsWith('tc_')) cliHandItem = 'product_bag';
             else cliHandItem = 'finished_lemon_raspado';
           }
-          const handGroup = cliMesh.getObjectByName('handItemGroup');
-          updateHandItemVisual(handGroup, cliHandItem);
+          if (cliMesh.userData.rightHandSocket) {
+            updateHandItemVisual(cliMesh.userData.rightHandSocket, cliHandItem);
+          }
         });
       });
 
-      // Limpiar mallas de clientes que ya salieron del mapa
+      // Gerente General (Usuario con aura dorada + Plumbob en movimiento entre los 6 negocios y Oficina Consorcio)
+      const mgrData = freshGame.gerenteState;
+      if (mgrData) {
+        const mgrProfile = sims2ConfigMap.gerente || defaultProfiles.gerente;
+        let mgrMesh = actorGroupsRef.current.gerente;
+        if (!mgrMesh) {
+          mgrMesh = createSims2ActorGroup(mgrProfile);
+          const initW = mgrData.worldPos || [-14, 0, -5];
+          mgrMesh.position.set(initW[0], 0, initW[2]);
+          mgrMesh.userData._profileRef = mgrProfile;
+          scene.add(mgrMesh);
+          actorGroupsRef.current.gerente = mgrMesh;
+        } else if (mgrMesh.userData._profileRef !== mgrProfile) {
+          syncSims2ActorProfile(mgrMesh, mgrProfile);
+          mgrMesh.userData._profileRef = mgrProfile;
+        }
+
+        const targetW = mgrData.worldPos || [mgrMesh.position.x, 0, mgrMesh.position.z];
+        const mdx = targetW[0] - mgrMesh.position.x;
+        const mdz = targetW[2] - mgrMesh.position.z;
+        const mgrMoving = Math.hypot(mdx, mdz) > 0.08;
+        mgrMesh.position.x += mdx * 0.22;
+        mgrMesh.position.z += mdz * 0.22;
+        mgrMesh.position.y = 0;
+
+        if (mgrMoving) {
+          mgrMesh.rotation.y = lerpAngle(mgrMesh.rotation.y, Math.atan2(mdx, mdz), 0.25);
+        } else if (mgrData.targetWaypoint?.startsWith('eq_')) {
+          const eqMatch = mgrData.targetWaypoint.replace(/^eq_/, '');
+          const mach = machineGroupsRef.current[eqMatch];
+          if (mach) {
+            mach.getWorldPosition(tmpMachineWorldPos);
+            const tdx = tmpMachineWorldPos.x - mgrMesh.position.x;
+            const tdz = tmpMachineWorldPos.z - mgrMesh.position.z;
+            if (Math.hypot(tdx, tdz) > 0.05) {
+              mgrMesh.rotation.y = lerpAngle(mgrMesh.rotation.y, Math.atan2(tdx, tdz), 0.22);
+            }
+          }
+        } else if (mgrData.animacionActual === 'EAT_AT_TABLE') {
+          mgrMesh.rotation.y = lerpAngle(mgrMesh.rotation.y, 0, 0.16);
+        } else {
+          mgrMesh.rotation.y = lerpAngle(mgrMesh.rotation.y, 0, 0.16);
+        }
+
+        animateSims2Actor(mgrMesh, mgrData.animacionActual, mgrMoving, nowSec);
+        if (mgrMesh.userData.rightHandSocket) {
+          updateHandItemVisual(mgrMesh.userData.rightHandSocket, mgrData.itemEnMano || null);
+        }
+      }
+
+      // Familia (Esposa, Alex 12 años y Bárbara 8 años entre 3:00 y 4:00 PM en Oficina o Hawaiian Paradise)
+      const famState = freshGame.familiaState;
+      if (famState?.visitActive && Array.isArray(famState.miembros)) {
+        famState.miembros.forEach((fam) => {
+          const famId = fam.sims2Id || fam.id;
+          activeFamiliaIds.add(famId);
+          const famProfile = sims2ConfigMap[famId] || defaultProfiles[famId] || defaultProfiles.familia_esposa;
+          let famMesh = actorGroupsRef.current.familia[famId];
+          if (!famMesh) {
+            famMesh = createSims2ActorGroup(famProfile);
+            const initFw = fam.worldPos || [26.5, 0, 5.2];
+            famMesh.position.set(initFw[0], 0, initFw[2]);
+            famMesh.userData._profileRef = famProfile;
+            scene.add(famMesh);
+            actorGroupsRef.current.familia[famId] = famMesh;
+          } else if (famMesh.userData._profileRef !== famProfile) {
+            syncSims2ActorProfile(famMesh, famProfile);
+            famMesh.userData._profileRef = famProfile;
+          }
+
+          const targetFw = fam.worldPos || [famMesh.position.x, 0, famMesh.position.z];
+          const fdx = targetFw[0] - famMesh.position.x;
+          const fdz = targetFw[2] - famMesh.position.z;
+          const famMoving = Math.hypot(fdx, fdz) > 0.08;
+          famMesh.position.x += fdx * 0.22;
+          famMesh.position.z += fdz * 0.22;
+          famMesh.position.y = 0;
+
+          if (famMoving) {
+            famMesh.rotation.y = lerpAngle(famMesh.rotation.y, Math.atan2(fdx, fdz), 0.24);
+          } else if (fam.targetWaypoint?.startsWith('sofa_tv')) {
+            famMesh.rotation.y = lerpAngle(famMesh.rotation.y, Math.PI, 0.18);
+          } else {
+            famMesh.rotation.y = lerpAngle(famMesh.rotation.y, 0, 0.18);
+          }
+
+          animateSims2Actor(famMesh, fam.animacionActual, famMoving, nowSec);
+        });
+      }
+
+      // Limpiar mallas de empleados, familiares y clientes que ya salieron del mapa
+      Object.keys(actorGroupsRef.current.employees).forEach((empId) => {
+        if (!activeEmployeeIds.has(empId)) {
+          const oldEmp = actorGroupsRef.current.employees[empId];
+          oldEmp.userData.disposed = true;
+          scene.remove(oldEmp);
+          delete actorGroupsRef.current.employees[empId];
+        }
+      });
+      Object.keys(actorGroupsRef.current.familia).forEach((famId) => {
+        if (!activeFamiliaIds.has(famId)) {
+          const oldFam = actorGroupsRef.current.familia[famId];
+          oldFam.userData.disposed = true;
+          scene.remove(oldFam);
+          delete actorGroupsRef.current.familia[famId];
+        }
+      });
       Object.keys(actorGroupsRef.current.customers).forEach((cliId) => {
         if (!activeCustomerIds.has(cliId)) {
-          scene.remove(actorGroupsRef.current.customers[cliId]);
+          const oldCli = actorGroupsRef.current.customers[cliId];
+          oldCli.userData.disposed = true;
+          scene.remove(oldCli);
           delete actorGroupsRef.current.customers[cliId];
         }
       });
@@ -874,26 +1094,32 @@ export default function GameCanvas3D() {
           };
         };
 
-        // Etiquetas de cada local comercial y su empleado activo
+        // Etiquetas de empleados (1..4 por local) y clientes activos
         NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
-          const zone = NEGOCIOS_ZONES_3D[negId];
-          const [cx, , cz] = zone.center;
-          const empData = freshGame.empleadosPorNegocio[negId];
-          const empMesh = actorGroupsRef.current.employees[negId];
+          const zone = ALL_ZONES_3D[negId];
+          if (!zone) return;
+          const empLista =
+            freshGame.empleadosListaPorNegocio?.[negId] ||
+            (freshGame.empleadosPorNegocio?.[negId] ? [freshGame.empleadosPorNegocio[negId]] : []);
 
-          if (empMesh && empData) {
-            const screenPos = projectToScreen(new THREE.Vector3(empMesh.position.x, 2.05, empMesh.position.z));
+          empLista.forEach((empData, empIdx) => {
+            if (!empData) return;
+            const empMesh = actorGroupsRef.current.employees[empData.id];
+            if (!empMesh) return;
+            const profile = empMesh.userData.profile;
+            const labelY = Math.max(1.85, ((profile?.heightCm || 170) / 100) + 0.30);
+            const screenPos = projectToScreen(new THREE.Vector3(empMesh.position.x, labelY, empMesh.position.z));
             if (screenPos) {
               let texto = empData.textoAccion;
               let subProgress = null;
-              if (freshTrain.isTrainingMode && freshTrain.selectedNegocioId === negId) {
+              if (empIdx === 0 && freshTrain.isTrainingMode && freshTrain.selectedNegocioId === negId) {
                 const rec = freshTrain.recetasEntrenadas[freshTrain.selectedProductId];
                 const step = rec?.pasos?.[freshTrain.activeStepIndex];
                 if (step) {
                   texto = `[Entrenamiento Paso ${step.orden}] ${step.titulo}`;
                   subProgress = Math.min(100, Math.round((freshTrain.stepElapsedSec / Math.max(1, step.duracionSegundos)) * 100));
                 }
-              } else if (empData.estado === 'ATENDIENDO_CLIENTE' && empData.recetaActual) {
+              } else if ((empData.estado === 'ATENDIENDO_CLIENTE' || empData.estado === 'ATENDIENDO_QUEUE') && empData.recetaActual) {
                 const step = empData.recetaActual.pasos?.[empData.pasoActualIndex];
                 if (step) {
                   subProgress = Math.min(100, Math.round((empData.pasoElapsedSec / Math.max(1, step.duracionSegundos)) * 100));
@@ -901,22 +1127,22 @@ export default function GameCanvas3D() {
               }
 
               nextLabels.push({
-                id: `lbl_emp_${negId}`,
+                id: `lbl_emp_${empData.id}`,
                 x: screenPos.x,
                 y: screenPos.y,
-                badge: zone.nombre,
-                color: zone.colorHex,
+                badge: `${empData.nombre || `Emp ${empIdx + 1}`} · ${zone.nombre}`,
+                color: empData.enHorarioComida ? '#f59e0b' : zone.colorHex,
                 text: texto,
                 progress: subProgress
               });
             }
-          }
+          });
 
           // Globo de diálogo del cliente activo en este negocio
           const activeCli = freshGame.clientesColaPorNegocio[negId]?.[0];
           const cliMesh = activeCli ? actorGroupsRef.current.customers[activeCli.id] : null;
           if (activeCli && cliMesh && activeCli.globoTexto) {
-            const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.85, cliMesh.position.z));
+            const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.95, cliMesh.position.z));
             if (cliScreen) {
               nextLabels.push({
                 id: `lbl_cli_${activeCli.id}`,
@@ -931,10 +1157,49 @@ export default function GameCanvas3D() {
           }
         });
 
+        // Etiqueta flotante del Gerente General
+        if (mgrData && actorGroupsRef.current.gerente) {
+          const mgrMesh = actorGroupsRef.current.gerente;
+          const mgrY = Math.max(2.05, ((mgrMesh.userData.profile?.heightCm || 175) / 100) + 0.56);
+          const mgrScreen = projectToScreen(new THREE.Vector3(mgrMesh.position.x, mgrY, mgrMesh.position.z));
+          if (mgrScreen && mgrData.textoAccion) {
+            nextLabels.push({
+              id: 'lbl_gerente_general',
+              x: mgrScreen.x,
+              y: mgrScreen.y,
+              badge: '👑 Alex (Gerente General)',
+              color: '#facc15',
+              text: mgrData.textoAccion
+            });
+          }
+        }
+
+        // Etiquetas flotantes de la Familia cuando visitan Oficina o Hawaiian Paradise (3:00–4:00 PM)
+        if (famState?.visitActive && Array.isArray(famState.miembros)) {
+          famState.miembros.forEach((fam) => {
+            const famId = fam.sims2Id || fam.id;
+            const famMesh = actorGroupsRef.current.familia[famId];
+            if (!famMesh || !fam.textoAccion) return;
+            const famY = Math.max(1.55, ((famMesh.userData.profile?.heightCm || 150) / 100) + 0.42);
+            const famScreen = projectToScreen(new THREE.Vector3(famMesh.position.x, famY, famMesh.position.z));
+            if (famScreen) {
+              nextLabels.push({
+                id: `lbl_fam_${famId}`,
+                x: famScreen.x,
+                y: famScreen.y,
+                badge: fam.nombre,
+                color: '#ec4899',
+                text: fam.textoAccion,
+                isClient: true
+              });
+            }
+          });
+        }
+
         // Proyectar popups de pago en caja (+$50 estilo StarCraft SCV)
         const nextCash = [];
         (freshGame.cashPopups || []).forEach((cp) => {
-          const zone = NEGOCIOS_ZONES_3D[cp.negocioId];
+          const zone = ALL_ZONES_3D[cp.negocioId];
           const wpMap = WAYPOINTS_POR_NEGOCIO[cp.negocioId];
           if (!zone || !wpMap) return;
           const wpCaja = wpMap.caja_tpv_vendedor || wpMap.barra_vendedor || [1.4, 0, -0.5];
@@ -951,9 +1216,9 @@ export default function GameCanvas3D() {
           }
         });
 
-        // Proyectar ventanas flotantes de telemetría eléctrica junto a cada aparato en operación
+        // Proyectar ventanas flotantes de telemetría eléctrica junto a cada aparato en operación (incluye Oficina Consorcio)
         const nextTelemetry = [];
-        const totalKwhMesConsorcio = NEGOCIOS_ACTIVOS_IDS.reduce(
+        const totalKwhMesConsorcio = Object.keys(ALL_ZONES_3D).reduce(
           (acc, id) => acc + (freshGame.statsPorNegocio[id]?.kwhMes ?? freshGame.statsPorNegocio[id]?.kwhAcumulados ?? 0),
           0
         );
@@ -1020,7 +1285,7 @@ export default function GameCanvas3D() {
             if (!shouldDisplay) return;
 
             meshGroup.getWorldPosition(machineWorldPos);
-            const yOffset = eq.rol === 'clima' ? 0.35 : 1.48;
+            const yOffset = eq.rol === 'clima' || eqKey.includes('ac') ? 0.35 : 1.48;
             const screenPos = projectToScreen(
               new THREE.Vector3(machineWorldPos.x + 0.55, machineWorldPos.y + yOffset, machineWorldPos.z)
             );
@@ -1064,6 +1329,21 @@ export default function GameCanvas3D() {
       cancelAnimationFrame(animFrameId);
       window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('pointerdown', handleCanvasClick);
+      Object.values(actorGroupsRef.current.employees).forEach((g) => {
+        if (g) g.userData.disposed = true;
+      });
+      Object.values(actorGroupsRef.current.customers).forEach((g) => {
+        if (g) g.userData.disposed = true;
+      });
+      Object.values(actorGroupsRef.current.familia).forEach((g) => {
+        if (g) g.userData.disposed = true;
+      });
+      if (actorGroupsRef.current.gerente) {
+        actorGroupsRef.current.gerente.userData.disposed = true;
+      }
+      actorGroupsRef.current = { employees: {}, customers: {}, gerente: null, familia: {} };
+      machineGroupsRef.current = {};
+      meterDiscsRef.current = {};
       renderer.dispose();
     };
   }, []);
@@ -1083,16 +1363,35 @@ export default function GameCanvas3D() {
       'col_bv_bancada_4cab',
       'col_tc_mesa_corte',
       'col_tc_linea_costura',
-      'col_pi_bancada_prensas'
+      'col_pi_bancada_prensas',
+      'col_imp_racks_fondo'
     ]);
 
-    NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
-      const zone = NEGOCIOS_ZONES_3D[negId];
+    Object.keys(ALL_ZONES_3D).forEach((negId) => {
+      const zone = ALL_ZONES_3D[negId];
       const [cx, , cz] = zone.center;
       const blocks = collisionBlocksByNegocio[negId] || [];
 
       blocks.forEach((b) => {
-        if (EQUIPMENT_FOOTPRINT_BLOCK_IDS.has(b.id) && !showCollisionBlocks) {
+        const isSupersededOfficeModel =
+          b.id?.startsWith('col_oc_tv') || b.id?.startsWith('col_oc_escritorio') || b.id?.startsWith('col_oc_laptop');
+        if ((EQUIPMENT_FOOTPRINT_BLOCK_IDS.has(b.id) || isSupersededOfficeModel) && !showCollisionBlocks) {
+          return;
+        }
+
+        if (!showCollisionBlocks && b.id?.startsWith('col_oc_sofa')) {
+          const sofaGroup = new THREE.Group();
+          sofaGroup.position.set(cx + b.x, 0, cz + b.z);
+          const fabricMat = new THREE.MeshStandardMaterial({ color: '#1e3a8a', roughness: 0.78 });
+          const seat = new THREE.Mesh(new THREE.BoxGeometry(b.w, 0.42, b.d), fabricMat);
+          seat.position.y = 0.21;
+          seat.castShadow = true;
+          seat.receiveShadow = true;
+          const back = new THREE.Mesh(new THREE.BoxGeometry(b.w, 0.48, 0.18), fabricMat);
+          back.position.set(0, 0.56, b.d / 2 - 0.09);
+          back.castShadow = true;
+          sofaGroup.add(seat, back);
+          colGroup.add(sofaGroup);
           return;
         }
 
@@ -1147,8 +1446,10 @@ export default function GameCanvas3D() {
       // Si showNavMesh está activo, dibujar las celdas caminables (verde) vs bloqueadas (rojo)
       if (showNavMesh) {
         const step = 0.65;
-        for (let lx = -5.2; lx <= 5.2; lx += step) {
-          for (let lz = -4.2; lz <= 5.2; lz += step) {
+        const halfX = Math.max(3.6, (zone.size?.[0] || 10.4) / 2 - 0.4);
+        const halfZ = Math.max(3.6, (zone.size?.[2] || 9.0) / 2 - 0.4);
+        for (let lx = -halfX; lx <= halfX; lx += step) {
+          for (let lz = -halfZ; lz <= halfZ; lz += step) {
             const blocked = isLocalPointBlocked(lx, lz, negId, collisionBlocksByNegocio);
             const tile = new THREE.Mesh(
               new THREE.PlaneGeometry(step * 0.86, step * 0.86),
@@ -1176,7 +1477,7 @@ export default function GameCanvas3D() {
 
     customModels3D.forEach((item) => {
       if (!item.object3D) return;
-      const zone = NEGOCIOS_ZONES_3D[item.negocioId || 'hawaiian_paradise'];
+      const zone = ALL_ZONES_3D[item.negocioId || 'hawaiian_paradise'] || NEGOCIOS_ZONES_3D.hawaiian_paradise;
       const clone = item.object3D.clone();
       clone.position.set(
         zone.center[0] + (item.localX || 0),
@@ -1188,7 +1489,7 @@ export default function GameCanvas3D() {
     });
   }, [customModels3D]);
 
-  // Mover suavemente la cámara con animación interpolada cuando el usuario selecciona un negocio, vista general o el Medidor CFE
+  // Mover suavemente la cámara con animación interpolada cuando el usuario selecciona un negocio, Oficina, vista general o Medidor CFE
   useEffect(() => {
     const camera = cameraRef.current;
     const controls = controlsRef.current;
@@ -1199,15 +1500,15 @@ export default function GameCanvas3D() {
     const endTarget = new THREE.Vector3();
 
     if (targetId === 'ALL_CONSORCIO') {
-      endPos.set(0, 28, 28);
-      endTarget.set(0, 0, 1);
+      endPos.set(2, 30, 31);
+      endTarget.set(2, 0, 1);
     } else if (targetId === 'CFE_METER_INSPECT') {
       const mIdx = Math.max(0, (parseInt((focusedMedidorId || 'med_3').replace('med_', ''), 10) || 3) - 1);
       const zOff = 1 + (-2.2 + mIdx * 0.88);
       endPos.set(-19.5, 2.2, zOff + 0.8);
       endTarget.set(-22.4, 1.65, zOff);
-    } else if (NEGOCIOS_ZONES_3D[targetId]) {
-      const zone = NEGOCIOS_ZONES_3D[targetId];
+    } else if (ALL_ZONES_3D[targetId]) {
+      const zone = ALL_ZONES_3D[targetId];
       if (isTrainingMode) {
         endPos.set(zone.center[0], 6.5, zone.center[2] + 6.5);
         endTarget.set(zone.center[0], 1.0, zone.center[2] - 1.5);

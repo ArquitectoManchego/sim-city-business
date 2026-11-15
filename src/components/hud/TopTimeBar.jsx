@@ -20,12 +20,13 @@ import {
   ShieldAlert,
   Gauge,
   Building2,
-  ChevronDown
+  ChevronDown,
+  Sparkles
 } from 'lucide-react';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { useTrainingStore } from '../../store/useTrainingStore.js';
 import { useSceneEditorStore } from '../../store/useSceneEditorStore.js';
-import { NEGOCIOS_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
+import { NEGOCIOS_ZONES_3D, ALL_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
 import { evaluarCondicionesDemanda } from '../../engine/CustomerSpawner.js';
 
 export default function TopTimeBar() {
@@ -46,6 +47,7 @@ export default function TopTimeBar() {
   const setCfeReceiptModalOpen = useGameStore((s) => s.setCfeReceiptModalOpen);
   const setInventoryDrawerOpen = useGameStore((s) => s.setInventoryDrawerOpen);
   const setMarketingModalOpen = useGameStore((s) => s.setMarketingModalOpen);
+  const setCasStudioOpen = useGameStore((s) => s.setCasStudioOpen);
 
   const setTrainingMode = useTrainingStore((s) => s.setTrainingMode);
   const setImporterModalOpen = useSceneEditorStore((s) => s.setImporterModalOpen);
@@ -76,7 +78,7 @@ export default function TopTimeBar() {
     { scale: 600, label: '600x (1h=6s)', icon: Zap }
   ];
 
-  const activeZone = NEGOCIOS_ZONES_3D[focusedNegocioId];
+  const activeZone = ALL_ZONES_3D[focusedNegocioId] || NEGOCIOS_ZONES_3D[focusedNegocioId];
 
   // Ángulos en grados para distribuir los 6 negocios en un semicírculo elegante debajo de "Vista General"
   const arcAnglesDeg = [166, 136, 107, 73, 44, 14];
@@ -284,7 +286,7 @@ export default function TopTimeBar() {
                 />
               </svg>
 
-              {/* Opción Central: Consorcio General (Todos los locales) */}
+              {/* Opción Central: Consorcio General (Todos los locales) + Oficina Consorcio */}
               <button
                 onClick={() => {
                   setFocusedNegocioId('ALL_CONSORCIO');
@@ -302,7 +304,26 @@ export default function TopTimeBar() {
                 }`}
               >
                 <Building2 className="w-3.5 h-3.5" />
-                <span>Todo el Consorcio (6 Locales)</span>
+                <span>Todo el Consorcio</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setFocusedNegocioId('oficinas_consorcio');
+                  setIsVistaArcOpen(false);
+                }}
+                style={{
+                  '--arc-x': '160px',
+                  '--arc-y': '72px',
+                  animationDelay: '20ms'
+                }}
+                className={`pointer-events-auto arc-btn-pop absolute left-0 top-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-extrabold whitespace-nowrap border shadow-xl transition ${
+                  focusedNegocioId === 'oficinas_consorcio'
+                    ? 'bg-amber-400 text-slate-950 border-white'
+                    : 'bg-slate-900/95 text-amber-200 border-amber-400/60 hover:bg-slate-800'
+                }`}
+              >
+                <span>🏢 Oficina Consorcio</span>
               </button>
 
               {/* Los 6 Negocios dispuestos en Semicírculo alrededor de Vista General */}
@@ -343,8 +364,17 @@ export default function TopTimeBar() {
           )}
         </div>
 
-        {/* Derecha: Herramientas de Inventario, Campañas, Modelos SketchUp (.skp) y Colisiones */}
+        {/* Derecha: Herramientas Sims 2 CAS, Inventario, Campañas, Modelos SketchUp (.skp) y Colisiones */}
         <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            data-testid="open-cas-studio-btn"
+            onClick={() => setCasStudioOpen(true, 'gerente')}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-cyan-600/25 hover:bg-cyan-600/40 border border-cyan-400/60 text-cyan-200 text-[11px] font-bold transition shadow"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-emerald-300" />
+            <span>💎 Sims 2 CAS</span>
+          </button>
+
           <button
             onClick={() => setInventoryDrawerOpen(true)}
             className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-slate-800 border border-slate-700 text-sky-300 text-[11px] font-semibold transition"

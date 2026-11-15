@@ -501,13 +501,13 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
   imperia_uniformes: [
     {
       id: 'imp_uniforme_clinico_completo',
-      procesoId: 'imp_venta_menudeo',
-      nombre: 'Uniforme Clínico Doctor Completo (Filipina + Pantalón)',
+      procesoId: 'imp_uniforme_clinico_completo',
+      nombre: 'Uniforme Clínico Medicina (Estante Medicina + Probador)',
       tipoOperacion: 'COMPRA_Y_REVENTA',
       requiereProbador: true,
       precioVenta: 650.00,
       costoMateriales: 420.00,
-      pesoEnMix: 35,
+      pesoEnMix: 20,
       equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
       bom: [
         { insumoId: 'mat_stock_clinico_taller', cantidad: 1 },
@@ -515,14 +515,14 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       ]
     },
     {
-      id: 'imp_permachef_filipina_original',
-      procesoId: 'imp_venta_menudeo',
-      nombre: 'Filipina de Chef PermaChef Original (Boutique)',
+      id: 'imp_chef_gastronomia',
+      procesoId: 'imp_chef_gastronomia',
+      nombre: 'Filipina / Mandil Gastronomía + Bordado (Estante Gastronomía)',
       tipoOperacion: 'COMPRA_Y_REVENTA',
       requiereProbador: true,
-      precioVenta: 890.00,
-      costoMateriales: 560.00,
-      pesoEnMix: 30,
+      precioVenta: 590.00,
+      costoMateriales: 360.00,
+      pesoEnMix: 16,
       equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
       bom: [
         { insumoId: 'mat_stock_permachef', cantidad: 1 },
@@ -530,33 +530,78 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       ]
     },
     {
-      id: 'imp_clinik_juego_414_409',
-      procesoId: 'imp_venta_menudeo',
-      nombre: 'Juego Quirúrgico Clinik Premium Stretch',
+      id: 'imp_conjunto_enfermeria',
+      procesoId: 'imp_conjunto_enfermeria',
+      nombre: 'Conjunto Enfermería Blanco (Estante Enfermería + Probador)',
       tipoOperacion: 'COMPRA_Y_REVENTA',
       requiereProbador: true,
-      precioVenta: 2025.00,
-      costoMateriales: 1499.00,
+      precioVenta: 680.00,
+      costoMateriales: 430.00,
       pesoEnMix: 15,
       equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
       bom: [
-        { insumoId: 'mat_stock_clinik', cantidad: 1 },
+        { insumoId: 'mat_stock_clinico_taller', cantidad: 1 },
         { insumoId: 'mat_bolsa_empaque_imp', cantidad: 1 }
       ]
     },
     {
-      id: 'imp_pedido_corporativo_lote',
-      procesoId: 'imp_pedido_mayoreo',
-      nombre: 'Pedido Especial / Mayoreo Escolar o Clínico (5 Prendas)',
-      tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
+      id: 'imp_uniforme_escolar',
+      procesoId: 'imp_uniforme_escolar',
+      nombre: 'Uniforme Escolar Completo (Estante Escolares + Bordado)',
+      tipoOperacion: 'COMPRA_Y_REVENTA',
       requiereProbador: false,
-      precioVenta: 2450.00,
-      costoMateriales: 1400.00,
-      pesoEnMix: 20,
+      precioVenta: 420.00,
+      costoMateriales: 230.00,
+      pesoEnMix: 14,
       equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
       bom: [
-        { insumoId: 'mat_stock_clinico_taller', cantidad: 3 },
-        { insumoId: 'mat_bolsa_empaque_imp', cantidad: 3 }
+        { insumoId: 'mat_stock_clinico_taller', cantidad: 1 },
+        { insumoId: 'mat_bolsa_empaque_imp', cantidad: 1 }
+      ]
+    },
+    {
+      id: 'imp_camisola_industrial',
+      procesoId: 'imp_camisola_industrial',
+      nombre: 'Camisola / Overol Industrial (Estante Industriales)',
+      tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
+      requiereProbador: true,
+      precioVenta: 740.00,
+      costoMateriales: 440.00,
+      pesoEnMix: 13,
+      equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
+      bom: [
+        { insumoId: 'mat_stock_clinico_taller', cantidad: 1 },
+        { insumoId: 'mat_bolsa_empaque_imp', cantidad: 1 }
+      ]
+    },
+    {
+      id: 'imp_polo_proveedor',
+      procesoId: 'imp_polo_proveedor',
+      nombre: 'Playera Polo / Camisa Cotexa-Euro-Jasbec (Estante Proveedores)',
+      tipoOperacion: 'COMPRA_Y_REVENTA',
+      requiereProbador: false,
+      precioVenta: 340.00,
+      costoMateriales: 185.00,
+      pesoEnMix: 12,
+      equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
+      bom: [
+        { insumoId: 'mat_playera_gorra_blank', cantidad: 1 },
+        { insumoId: 'mat_bolsa_empaque_imp', cantidad: 1 }
+      ]
+    },
+    {
+      id: 'imp_pedido_b2b_empresa',
+      procesoId: 'imp_pedido_b2b_empresa',
+      nombre: 'Pedido Empresarial B2B Personalizado (Envía a Taller + Bordados)',
+      tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
+      requiereProbador: false,
+      precioVenta: 4800.00,
+      costoMateriales: 2450.00,
+      pesoEnMix: 10,
+      equiposInvolucrados: ['imp_tpv', 'imp_terminal'],
+      bom: [
+        { insumoId: 'mat_stock_clinico_taller', cantidad: 4 },
+        { insumoId: 'mat_bolsa_empaque_imp', cantidad: 4 }
       ]
     }
   ],
@@ -609,10 +654,10 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
     {
       id: 'bv_escudo_aemco',
       procesoId: 'bv_escudo_aemco',
-      nombre: 'Lote 4 Bordados Escudo Pecho (AEMCO 4 Cabezas 220V)',
+      nombre: 'Lote 4 Bordados Escudo Pecho (AEMCO 220V -> Entrega Imperia)',
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
-      precioVenta: 180.00,
-      costoMateriales: 28.00,
+      precioVenta: 240.00,
+      costoMateriales: 32.00,
       pesoEnMix: 60,
       equiposInvolucrados: ['bv_aemco_220'],
       bom: [
@@ -621,17 +666,17 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       ]
     },
     {
-      id: 'bv_logo_melco',
-      procesoId: 'bv_logo_melco',
-      nombre: 'Lote 4 Bordados Multicolor Corporativo (Melco 6/4)',
+      id: 'bv_nombre_melco',
+      procesoId: 'bv_nombre_melco',
+      nombre: 'Bordado Personalizado Nombre/Logo (Melco EMC -> Entrega Imperia)',
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
-      precioVenta: 220.00,
-      costoMateriales: 36.00,
+      precioVenta: 145.00,
+      costoMateriales: 22.00,
       pesoEnMix: 40,
       equiposInvolucrados: ['bv_melco_emc'],
       bom: [
-        { insumoId: 'mat_hilo_bordado', cantidad: 4 },
-        { insumoId: 'mat_pelon_estabilizador', cantidad: 4 }
+        { insumoId: 'mat_hilo_bordado', cantidad: 2 },
+        { insumoId: 'mat_pelon_estabilizador', cantidad: 2 }
       ]
     }
   ],
@@ -639,43 +684,29 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
   taller_costura: [
     {
       id: 'tc_filipina_chef',
-      procesoId: 'tc_filipina',
-      nombre: 'Confección Filipina Médica / Chef (Corte + Overlock + Recta + Plancha)',
+      procesoId: 'tc_filipina_chef',
+      nombre: 'Confección Filipina Médica / Chef (Secuencia Completa -> Imperia)',
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
       precioVenta: 480.00,
       costoMateriales: 160.00,
-      pesoEnMix: 50,
-      equiposInvolucrados: ['tc_cortadora', 'tc_overlock_5h', 'tc_rectas_singer', 'tc_plancha_vapor'],
+      pesoEnMix: 60,
+      equiposInvolucrados: ['tc_cortadora', 'tc_overlock_5h', 'tc_rectas_singer', 'tc_collaretera_singer', 'tc_plancha_vapor'],
       bom: [
         { insumoId: 'mat_rollo_gabardina_antifluidos', cantidad: 1.6 },
         { insumoId: 'mat_avios_costura', cantidad: 1 }
       ]
     },
     {
-      id: 'tc_pantalon_cocina',
-      procesoId: 'tc_pantalon',
-      nombre: 'Confección Pantalón Clínico / Cargo',
+      id: 'tc_bata_recta',
+      procesoId: 'tc_bata_recta',
+      nombre: 'Confección Prenda Recta Industrial + Planchado Intermedio',
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
-      precioVenta: 350.00,
-      costoMateriales: 125.00,
-      pesoEnMix: 35,
-      equiposInvolucrados: ['tc_cortadora', 'tc_overlock_5h', 'tc_rectas_singer', 'tc_plancha_vapor'],
+      precioVenta: 410.00,
+      costoMateriales: 135.00,
+      pesoEnMix: 40,
+      equiposInvolucrados: ['tc_cortadora', 'tc_rectas_singer', 'tc_plancha_vapor'],
       bom: [
         { insumoId: 'mat_rollo_gabardina_antifluidos', cantidad: 1.3 },
-        { insumoId: 'mat_avios_costura', cantidad: 1 }
-      ]
-    },
-    {
-      id: 'tc_polo_escolar',
-      procesoId: 'tc_playera_polo_stretch',
-      nombre: 'Confección Playera Polo Stretch (Incluye Collaretera)',
-      tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
-      precioVenta: 220.00,
-      costoMateriales: 90.00,
-      pesoEnMix: 15,
-      equiposInvolucrados: ['tc_cortadora', 'tc_overlock_5h', 'tc_rectas_singer', 'tc_collaretera_singer', 'tc_plancha_vapor'],
-      bom: [
-        { insumoId: 'mat_rollo_gabardina_antifluidos', cantidad: 1.0 },
         { insumoId: 'mat_avios_costura', cantidad: 1 }
       ]
     }
@@ -689,7 +720,7 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
       precioVenta: 95.00,
       costoMateriales: 32.00,
-      pesoEnMix: 35,
+      pesoEnMix: 25,
       equiposInvolucrados: ['pi_pc_diseno', 'pi_epson', 'pi_plancha_tazas'],
       bom: [
         { insumoId: 'mat_taza_blanca_11oz', cantidad: 1 },
@@ -699,11 +730,11 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
     {
       id: 'pi_dtf_playeras',
       procesoId: 'pi_dtf_playeras',
-      nombre: 'Playera Estampada con Planchado DTF',
+      nombre: 'Playera DTF (Combi/Promox -> 160°C 5m + 3x 15s/20s)',
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
-      precioVenta: 190.00,
+      precioVenta: 220.00,
       costoMateriales: 85.00,
-      pesoEnMix: 40,
+      pesoEnMix: 30,
       equiposInvolucrados: ['pi_pc_diseno', 'pi_plancha_plana'],
       bom: [
         { insumoId: 'mat_playera_gorra_blank', cantidad: 1 },
@@ -711,16 +742,45 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       ]
     },
     {
-      id: 'pi_laser_termos',
-      procesoId: 'pi_laser_grabado',
-      nombre: 'Termo Acero Grabado en Láser CNC (Atomstack A20)',
+      id: 'pi_vinil_textil_euro',
+      procesoId: 'pi_vinil_textil_euro',
+      nombre: 'Vinil Textil Euro (Plotter + Depilado + 140°C + 3x 20s/20s)',
       tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
-      precioVenta: 240.00,
-      costoMateriales: 100.00,
-      pesoEnMix: 25,
-      equiposInvolucrados: ['pi_pc_diseno', 'pi_atomstack'],
+      precioVenta: 195.00,
+      costoMateriales: 70.00,
+      pesoEnMix: 20,
+      equiposInvolucrados: ['pi_pc_diseno', 'pi_plancha_plana'],
       bom: [
-        { insumoId: 'mat_termo_acrilico_laser', cantidad: 1 }
+        { insumoId: 'mat_playera_gorra_blank', cantidad: 1 },
+        { insumoId: 'mat_transfer_dtf_vinil', cantidad: 1 }
+      ]
+    },
+    {
+      id: 'pi_sublimacion_plana',
+      procesoId: 'pi_sublimacion_plana',
+      nombre: 'Sublimación Plana > Carta (Imagen Impresa 200°C 5m + 60s)',
+      tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
+      precioVenta: 260.00,
+      costoMateriales: 90.00,
+      pesoEnMix: 15,
+      equiposInvolucrados: ['pi_pc_diseno', 'pi_plancha_plana'],
+      bom: [
+        { insumoId: 'mat_playera_gorra_blank', cantidad: 1 },
+        { insumoId: 'mat_transfer_dtf_vinil', cantidad: 1 }
+      ]
+    },
+    {
+      id: 'pi_lote_b2b_playeras',
+      procesoId: 'pi_lote_b2b_playeras',
+      nombre: 'Lote B2B Empresarial (50 Playeras DTF -> Cajas Almacén Publi)',
+      tipoOperacion: 'FABRICACION_INTERNA_Y_PEDIDOS',
+      precioVenta: 6800.00,
+      costoMateriales: 2900.00,
+      pesoEnMix: 10,
+      equiposInvolucrados: ['pi_pc_diseno', 'pi_plancha_plana'],
+      bom: [
+        { insumoId: 'mat_playera_gorra_blank', cantidad: 10 },
+        { insumoId: 'mat_transfer_dtf_vinil', cantidad: 10 }
       ]
     }
   ]

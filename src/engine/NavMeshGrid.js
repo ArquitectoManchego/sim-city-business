@@ -3,7 +3,7 @@
  * Define con exactitud por dónde pueden caminar los empleados y clientes dentro y fuera de cada local.
  */
 
-import { NEGOCIOS_ZONES_3D } from './ChoreographyRegistry.js';
+import { NEGOCIOS_ZONES_3D, ALL_ZONES_3D } from './ChoreographyRegistry.js';
 
 /**
  * Bloques de colisión por defecto para cada local comercial (Mostradores, Barras, Islas de Trabajo, Muros Internos).
@@ -20,7 +20,7 @@ export const DEFAULT_COLLISION_BLOCKS_POR_NEGOCIO = {
   imperia_uniformes: [
     { id: 'col_imp_mostrador', label: 'Mostrador y Caja Imperia', tagType: 'COLLISION_BLOCK', x: 0.4, z: -0.1, w: 4.2, d: 0.75, h: 1.0, color: '#059669' },
     { id: 'col_imp_probadores', label: 'Módulo de Probadores', tagType: 'COLLISION_BLOCK', x: -5.1, z: 2.9, w: 1.2, d: 2.8, h: 2.2, color: '#334155' },
-    { id: 'col_imp_racks_fondo', label: 'Exhibidores de Uniformes', tagType: 'COLLISION_BLOCK', x: -1.2, z: -4.1, w: 8.5, d: 0.85, h: 1.8, color: '#0f766e' }
+    { id: 'col_imp_racks_fondo', label: '6 Estantes por Rama Imperia', tagType: 'COLLISION_BLOCK', x: 0.0, z: -4.15, w: 10.6, d: 0.65, h: 1.8, color: '#0f766e' }
   ],
   papeleria_imperiarte: [
     { id: 'col_pap_mostrador', label: 'Mostrador Papelería & TPV', tagType: 'COLLISION_BLOCK', x: 0.2, z: 0.0, w: 4.2, d: 0.75, h: 1.0, color: '#2563eb' },
@@ -37,6 +37,12 @@ export const DEFAULT_COLLISION_BLOCKS_POR_NEGOCIO = {
   taller_publi_imperia: [
     { id: 'col_pi_mostrador', label: 'Mostrador Publi-Imperia', tagType: 'COLLISION_BLOCK', x: 0.2, z: 0.4, w: 3.8, d: 0.7, h: 0.95, color: '#0891b2' },
     { id: 'col_pi_bancada_prensas', label: 'Bancada de Planchas y Láser', tagType: 'COLLISION_BLOCK', x: 0.8, z: -3.9, w: 7.5, d: 0.95, h: 0.9, color: '#155e75' }
+  ],
+  oficinas_consorcio: [
+    { id: 'col_oc_escritorio', label: 'Escritorio Gerencia & Diseño PC', tagType: 'COLLISION_BLOCK', x: -2.2, z: -2.6, w: 1.8, d: 0.75, h: 0.78, color: '#ca8a04' },
+    { id: 'col_oc_mueble_tv', label: 'Mueble Smart TV 32"', tagType: 'ACCESSORY', x: 2.2, z: -3.75, w: 1.6, d: 0.45, h: 0.65, color: '#334155' },
+    { id: 'col_oc_sofa_tv', label: 'Sofá Descanso TV / Clima', tagType: 'ACCESSORY', x: 2.4, z: -0.1, w: 2.2, d: 0.75, h: 0.8, color: '#475569' },
+    { id: 'col_oc_mesa_comer', label: 'Mesa Comedor Oficina', tagType: 'ACCESSORY', x: -1.6, z: 2.2, w: 1.4, d: 0.85, h: 0.76, color: '#78350f' }
   ]
 };
 
@@ -44,7 +50,7 @@ export const DEFAULT_COLLISION_BLOCKS_POR_NEGOCIO = {
  * Verifica si un punto local (lx, lz) dentro de un negocio choca con un muro o bloque de colisión
  */
 export function isLocalPointBlocked(lx, lz, negocioId = 'hawaiian_paradise', customBlocksMap = null) {
-  const zone = NEGOCIOS_ZONES_3D[negocioId];
+  const zone = ALL_ZONES_3D[negocioId] || NEGOCIOS_ZONES_3D[negocioId];
   if (!zone) return false;
   const halfW = zone.size[0] / 2;
   const halfD = zone.size[2] / 2;
@@ -106,12 +112,15 @@ export function computeLocalPathAStar(startLocal, targetLocal, negocioId = 'hawa
     return [[tx, 0, tz]];
   }
 
-  // Grilla A* de resolución 0.40m
+  // Grilla A* de resolución 0.40m adaptada al tamaño de la zona
+  const zone = ALL_ZONES_3D[negocioId] || NEGOCIOS_ZONES_3D[negocioId];
+  const halfW = zone ? zone.size[0] / 2 : 6.0;
+  const halfD = zone ? zone.size[2] / 2 : 5.0;
   const step = 0.40;
-  const minX = -5.6;
-  const maxX = 5.6;
-  const minZ = -4.6;
-  const maxZ = 5.6;
+  const minX = -(halfW - 0.4);
+  const maxX = halfW - 0.4;
+  const minZ = -(halfD - 0.4);
+  const maxZ = halfD + 0.6;
   const cols = Math.round((maxX - minX) / step);
   const rows = Math.round((maxZ - minZ) / step);
 
