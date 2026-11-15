@@ -1,9 +1,8 @@
 /**
  * Motor Gráfico 3D Principal (Three.js WebGL) para SIM CITY BUSINESS.
  * Renderiza los 6 locales comerciales, Pisos, Muros, Bloques de Colisión, Grilla NavMesh A*,
- * Equipos Eléctricos detallados (Máquina de Raspados con palanca y hielo, Crepera, Licuadora,
- * Cafetera, TPV, DocuColor, Bordadoras 4 cabezas, Costura, Sublimación/Láser), Materia Prima,
- * Empleados y Clientes con globos de diálogo en vivo y Pared de Medidores CFE.
+ * Equipos Eléctricos procedurales detallados por local, Ventanas flotantes de telemetría
+ * por operación, Empleados articulados con animaciones paso a paso y Clientes 3D.
  */
 
 import React, { useEffect, useRef, useState } from 'react';
@@ -17,9 +16,80 @@ import { isLocalPointBlocked } from '../../engine/NavMeshGrid.js';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { useSceneEditorStore } from '../../store/useSceneEditorStore.js';
 import { useTrainingStore } from '../../store/useTrainingStore.js';
+import { calcularCobroCFECompleto } from '../../shared/simuladorCFE.js';
+import {
+  createApplianceModel3D,
+  updateApplianceVisualState,
+  updateHandItemVisual
+} from './EquipmentModels3D.js';
+
+const APPLIANCE_SHORT_NAMES = {
+  hp_raspadora: 'Raspadora Hielo',
+  hp_crepera: 'Crepera Prof.',
+  hp_marquesitera: 'Marquesitera',
+  hp_licuadora: 'Licuadora Ninja',
+  hp_breville: 'Espresso Gaggia',
+  hp_tetera: 'Tetera Eléc.',
+  hp_bano_maria: 'Baño María',
+  hp_tpv: 'Caja TPV',
+  hp_refrigerador: 'Refrigerador 11p',
+  hp_congelador: 'Congelador',
+  hp_ac_clientes: 'Minisplit 1.5TR',
+  imp_tpv: 'Caja TPV Imperia',
+  imp_terminal: 'Terminal POS',
+  imp_ac: 'Minisplit 1TR',
+  pap_docucolor: 'Xerox DocuColor',
+  pap_tpv: 'PC AIO / TPV',
+  pap_ac_18k: 'Minisplit 1.5TR',
+  bv_aemco_220: 'Bordadora AEMCO 4C',
+  bv_melco_emc: 'Bordadora Melco',
+  bv_ac: 'Minisplit 1.5TR',
+  tc_cortadora: 'Cortadora Disco',
+  tc_overlock_5h: 'Overlock 5H',
+  tc_rectas_singer: 'Rectas Singer',
+  tc_collaretera_singer: 'Collaretera Singer',
+  tc_plancha_vapor: 'Plancha Caldera',
+  tc_ac: 'Minisplit 1TR',
+  pi_pc_diseno: 'PC Diseño i7',
+  pi_epson: 'Epson Sublimación',
+  pi_plancha_tazas: 'Plancha Tazas',
+  pi_plancha_plana: 'Plancha Plana',
+  pi_atomstack: 'Láser Atomstack'
+};
+
+function formatOpDuration(totalSeconds) {
+  const sec = Math.max(0, Math.floor(totalSeconds || 0));
+  const hrs = Math.floor(sec / 3600);
+  const mins = Math.floor((sec % 3600) / 60);
+  const remSec = sec % 60;
+  if (hrs > 0) {
+    return `${hrs}h ${String(mins).padStart(2, '0')}m`;
+  }
+  return `${String(mins).padStart(2, '0')}:${String(remSec).padStart(2, '0')}`;
+}
+
+function formatOpCostMxn(cost) {
+  const val = Math.max(0, cost || 0);
+  if (val < 0.1) return `$${val.toFixed(4)}`;
+  if (val < 1.0) return `$${val.toFixed(3)}`;
+  return `$${val.toFixed(2)}`;
+}
+
+function formatWattsText(watts) {
+  const w = Math.round(watts || 0);
+  if (w >= 1000) return `${w.toLocaleString()} W (${(w / 1000).toFixed(2)} kW)`;
+  return `${w} W`;
+}
+
+function lerpAngle(current, target, alpha) {
+  let diff = target - current;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  return current + diff * alpha;
+}
 
 /**
- * Construye una figura humanoide 3D estilizada para Empleado o Cliente
+ * Construye una figura humanoide 3D estilizada con pivotes en hombros para Empleado o Cliente
  */
 function createHumanoidActorMesh(shirtColorHex = '#10b981', isEmployee = false) {
   const group = new THREE.Group();
@@ -69,20 +139,31 @@ function createHumanoidActorMesh(shirtColorHex = '#10b981', isEmployee = false) 
     group.add(cap);
   }
 
-  // Brazos
+  // Brazos articulados desde pivote de hombro para gestos de cocina/taller
   const armGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.48, 8);
   const armMat = new THREE.MeshStandardMaterial({ color: shirtColorHex, roughness: 0.5 });
-  const leftArm = new THREE.Mesh(armGeo, armMat);
-  leftArm.position.set(-0.28, 0.88, 0.08);
-  leftArm.rotation.x = -0.35;
-  const rightArm = new THREE.Mesh(armGeo, armMat);
-  rightArm.position.set(0.28, 0.88, 0.08);
-  rightArm.rotation.x = -0.35;
-  group.add(leftArm, rightArm);
 
-  // Contenedor de objeto en manos (hielo, vaso, raspado, jarabe, prenda)
+  const leftArmPivot = new THREE.Group();
+  leftArmPivot.name = 'leftArmPivot';
+  leftArmPivot.position.set(-0.28, 1.08, 0);
+  const leftArm = new THREE.Mesh(armGeo, armMat);
+  leftArm.position.set(0, -0.20, 0.06);
+  leftArm.rotation.x = -0.35;
+  leftArmPivot.add(leftArm);
+
+  const rightArmPivot = new THREE.Group();
+  rightArmPivot.name = 'rightArmPivot';
+  rightArmPivot.position.set(0.28, 1.08, 0);
+  const rightArm = new THREE.Mesh(armGeo, armMat);
+  rightArm.position.set(0, -0.20, 0.06);
+  rightArm.rotation.x = -0.35;
+  rightArmPivot.add(rightArm);
+
+  group.add(leftArmPivot, rightArmPivot);
+
+  // Contenedor de objeto en manos (bowl, rastrillo, espátula, plato, hielo, vaso, etc.)
   const handItemGroup = new THREE.Group();
-  handItemGroup.position.set(0, 0.92, 0.34);
+  handItemGroup.position.set(0, 0.92, 0.36);
   handItemGroup.name = 'handItemGroup';
   group.add(handItemGroup);
 
@@ -90,200 +171,58 @@ function createHumanoidActorMesh(shirtColorHex = '#10b981', isEmployee = false) 
 }
 
 /**
- * Actualiza el objeto 3D que lleva en la mano el vendedor o el cliente (ej. bloque de hielo, vaso, raspado de limón)
+ * Articula brazos y orientación de manos de acuerdo al tipo de operación paso a paso
  */
-function updateHandItemVisual(handItemGroup, itemType) {
-  if (!handItemGroup) return;
-  if (handItemGroup.userData.currentItemType === itemType) return;
-  handItemGroup.userData.currentItemType = itemType;
+function applyEmployeeGestureAnimation(empMesh, animType, isMoving, nowSec) {
+  const leftPivot = empMesh.getObjectByName('leftArmPivot');
+  const rightPivot = empMesh.getObjectByName('rightArmPivot');
+  const handGroup = empMesh.getObjectByName('handItemGroup');
+  if (!leftPivot || !rightPivot) return;
 
-  while (handItemGroup.children.length > 0) {
-    handItemGroup.remove(handItemGroup.children[0]);
-  }
-  if (!itemType) return;
-
-  if (itemType === 'ice_block') {
-    const ice = new THREE.Mesh(
-      new THREE.BoxGeometry(0.26, 0.22, 0.26),
-      new THREE.MeshStandardMaterial({ color: '#7dd3fc', transparent: true, opacity: 0.85, roughness: 0.15 })
-    );
-    handItemGroup.add(ice);
-  } else if (itemType === 'empty_cup') {
-    const cup = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.10, 0.07, 0.24, 12),
-      new THREE.MeshStandardMaterial({ color: '#e2e8f0', transparent: true, opacity: 0.75 })
-    );
-    handItemGroup.add(cup);
-  } else if (itemType === 'shaved_ice_cup') {
-    const cup = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.10, 0.07, 0.24, 12),
-      new THREE.MeshStandardMaterial({ color: '#f8fafc' })
-    );
-    const snow = new THREE.Mesh(
-      new THREE.SphereGeometry(0.11, 12, 12),
-      new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.9 })
-    );
-    snow.position.y = 0.12;
-    cup.add(snow);
-    handItemGroup.add(cup);
-  } else if (itemType === 'lemon_syrup_pouring') {
-    const bottle = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.06, 0.07, 0.28, 10),
-      new THREE.MeshStandardMaterial({ color: '#84cc16', roughness: 0.2 })
-    );
-    bottle.rotation.z = 0.85;
-    handItemGroup.add(bottle);
-  } else if (itemType === 'finished_lemon_raspado' || itemType === 'product_bag') {
-    const cup = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.11, 0.08, 0.25, 12),
-      new THREE.MeshStandardMaterial({ color: '#a3e635' })
-    );
-    const dome = new THREE.Mesh(
-      new THREE.SphereGeometry(0.11, 12, 12),
-      new THREE.MeshStandardMaterial({ color: '#84cc16', roughness: 0.4 })
-    );
-    dome.position.y = 0.13;
-    const straw = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.015, 0.015, 0.22, 8),
-      new THREE.MeshStandardMaterial({ color: '#f43f5e' })
-    );
-    straw.position.set(0.03, 0.20, 0);
-    straw.rotation.z = -0.25;
-    cup.add(dome, straw);
-    handItemGroup.add(cup);
-  } else if (itemType === 'garment_hanger') {
-    const garment = new THREE.Mesh(
-      new THREE.BoxGeometry(0.36, 0.42, 0.08),
-      new THREE.MeshStandardMaterial({ color: '#0ea5e9', roughness: 0.6 })
-    );
-    handItemGroup.add(garment);
-  }
-}
-
-/**
- * Construye una Máquina de Raspados 3D detallada con tolva de hielo, palanca móvil, vaso y partículas de nieve
- */
-function createIceShaverMachine3D() {
-  const group = new THREE.Group();
-
-  // Mesa soporte de acero inoxidable
-  const table = new THREE.Mesh(
-    new THREE.BoxGeometry(0.95, 0.85, 0.75),
-    new THREE.MeshStandardMaterial({ color: '#94a3b8', metalness: 0.6, roughness: 0.3 })
-  );
-  table.position.y = 0.425;
-  table.castShadow = true;
-  group.add(table);
-
-  // Cuerpo de la máquina Hawaiian
-  const body = new THREE.Mesh(
-    new THREE.BoxGeometry(0.42, 0.48, 0.40),
-    new THREE.MeshStandardMaterial({ color: '#0284c7', roughness: 0.3 })
-  );
-  body.position.set(0, 1.08, -0.05);
-  group.add(body);
-
-  // Tolva transparente de acrílico con bloque de hielo interior
-  const hopper = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.18, 0.18, 0.32, 16),
-    new THREE.MeshStandardMaterial({ color: '#e0f2fe', transparent: true, opacity: 0.45 })
-  );
-  hopper.position.set(0, 1.46, -0.05);
-  group.add(hopper);
-
-  const iceBlockInside = new THREE.Mesh(
-    new THREE.BoxGeometry(0.22, 0.22, 0.22),
-    new THREE.MeshStandardMaterial({ color: '#38bdf8', transparent: true, opacity: 0.85 })
-  );
-  iceBlockInside.position.set(0, 1.44, -0.05);
-  iceBlockInside.name = 'shaverIceBlock';
-  group.add(iceBlockInside);
-
-  // Palanca superior compresora (animada cuando está rallando hielo)
-  const leverPivot = new THREE.Group();
-  leverPivot.position.set(0, 1.64, -0.05);
-  leverPivot.name = 'shaverLeverPivot';
-  const leverArm = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.025, 0.025, 0.45, 8),
-    new THREE.MeshStandardMaterial({ color: '#f59e0b', metalness: 0.5 })
-  );
-  leverArm.rotation.x = Math.PI / 3;
-  leverArm.position.set(0, 0.08, 0.18);
-  leverPivot.add(leverArm);
-  group.add(leverPivot);
-
-  // Vaso receptor bajo la salida de hielo y partículas de hielo rallado
-  const cupUnder = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.09, 0.06, 0.22, 12),
-    new THREE.MeshStandardMaterial({ color: '#ffffff', transparent: true, opacity: 0.85 })
-  );
-  cupUnder.position.set(0, 0.96, 0.22);
-  cupUnder.name = 'shaverCupUnder';
-  group.add(cupUnder);
-
-  const snowStream = new THREE.Mesh(
-    new THREE.ConeGeometry(0.08, 0.28, 10),
-    new THREE.MeshStandardMaterial({ color: '#f8fafc', emissive: '#bae6fd', emissiveIntensity: 0.5 })
-  );
-  snowStream.position.set(0, 1.12, 0.22);
-  snowStream.name = 'shaverSnowStream';
-  snowStream.visible = false;
-  group.add(snowStream);
-
-  // Halo luminoso de estado eléctrico en el piso
-  const statusRing = new THREE.Mesh(
-    new THREE.RingGeometry(0.55, 0.68, 24),
-    new THREE.MeshBasicMaterial({ color: '#10b981', side: THREE.DoubleSide, transparent: true, opacity: 0.0 })
-  );
-  statusRing.rotation.x = -Math.PI / 2;
-  statusRing.position.y = 0.02;
-  statusRing.name = 'statusRing';
-  group.add(statusRing);
-
-  return group;
-}
-
-/**
- * Construye una máquina genérica industrial o de cocina con su halo de estado eléctrico
- */
-function createGenericMachine3D(colorHex = '#f59e0b', w = 0.9, h = 1.1, d = 0.75, typeHint = 'box') {
-  const group = new THREE.Group();
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(w, 0.82, d),
-    new THREE.MeshStandardMaterial({ color: '#334155', roughness: 0.6 })
-  );
-  base.position.y = 0.41;
-  base.castShadow = true;
-  group.add(base);
-
-  if (typeHint === 'crepera') {
-    const plate = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.36, 0.36, 0.08, 20),
-      new THREE.MeshStandardMaterial({ color: '#090d16', metalness: 0.7, roughness: 0.3 })
-    );
-    plate.position.y = 0.86;
-    plate.name = 'hotPlate';
-    group.add(plate);
-  } else {
-    const topUnit = new THREE.Mesh(
-      new THREE.BoxGeometry(w * 0.82, Math.max(0.28, h - 0.82), d * 0.80),
-      new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.35, metalness: 0.25 })
-    );
-    topUnit.position.y = 0.82 + Math.max(0.28, h - 0.82) / 2;
-    topUnit.castShadow = true;
-    group.add(topUnit);
+  if (isMoving) {
+    const swing = Math.sin(nowSec * 10.0) * 0.45;
+    leftPivot.rotation.set(swing, 0, 0);
+    rightPivot.rotation.set(-swing, 0, 0);
+    if (handGroup) handGroup.position.set(0, 0.92, 0.36);
+    return;
   }
 
-  const statusRing = new THREE.Mesh(
-    new THREE.RingGeometry(Math.max(w, d) * 0.58, Math.max(w, d) * 0.70, 24),
-    new THREE.MeshBasicMaterial({ color: '#10b981', side: THREE.DoubleSide, transparent: true, opacity: 0.0 })
-  );
-  statusRing.rotation.x = -Math.PI / 2;
-  statusRing.position.y = 0.02;
-  statusRing.name = 'statusRing';
-  group.add(statusRing);
+  leftPivot.rotation.set(0, 0, 0);
+  rightPivot.rotation.set(0, 0, 0);
+  if (handGroup) handGroup.position.set(0, 0.92, 0.36);
 
-  return group;
+  if (animType === 'POUR_BATTER') {
+    rightPivot.rotation.set(-1.12, 0, -0.15);
+    leftPivot.rotation.set(-0.65, 0, 0.12);
+    if (handGroup) handGroup.position.set(0, 1.04 + Math.sin(nowSec * 4) * 0.02, 0.46);
+  } else if (animType === 'CIRCULAR_RAKE') {
+    rightPivot.rotation.set(-1.0 + Math.cos(nowSec * 5.2) * 0.18, 0, Math.sin(nowSec * 5.2) * 0.28);
+    leftPivot.rotation.set(-0.45, 0, 0);
+    if (handGroup) {
+      handGroup.position.set(Math.sin(nowSec * 5.2) * 0.12, 0.98, 0.46 + Math.cos(nowSec * 5.2) * 0.08);
+    }
+  } else if (animType === 'SPREAD_INGREDIENTS') {
+    rightPivot.rotation.set(-0.98, 0, Math.sin(nowSec * 6.5) * 0.35);
+    leftPivot.rotation.set(-0.82, 0, 0.15);
+    if (handGroup) handGroup.position.set(Math.sin(nowSec * 6.5) * 0.10, 0.98, 0.44);
+  } else if (animType === 'FOLD_CREPA') {
+    leftPivot.rotation.set(-0.95, 0, 0.18);
+    rightPivot.rotation.set(-1.0 + Math.sin(nowSec * 5.0) * 0.25, 0, -0.18);
+    if (handGroup) handGroup.position.set(0, 1.00, 0.44);
+  } else if (animType === 'WAIT_HEATING' || animType === 'WAIT_COOKING') {
+    leftPivot.rotation.set(-0.3, 0, 0);
+    rightPivot.rotation.set(-0.72 + Math.sin(nowSec * 2.2) * 0.08, 0, 0);
+  } else if (animType === 'CARRY_BOWL' || animType === 'CARRY_PLATE') {
+    leftPivot.rotation.set(-0.82, 0, 0.14);
+    rightPivot.rotation.set(-0.82, 0, -0.14);
+    if (handGroup) handGroup.position.set(0, 0.96, 0.42);
+  } else if (animType === 'OPERATE_TPV') {
+    leftPivot.rotation.set(-0.25, 0, 0);
+    rightPivot.rotation.set(-0.95 + Math.sin(nowSec * 9.0) * 0.15, 0, 0);
+  } else if (animType === 'TALK_CLIENT') {
+    leftPivot.rotation.set(-0.25, 0, 0);
+    rightPivot.rotation.set(-0.45 + Math.sin(nowSec * 4.5) * 0.22, 0, 0);
+  }
 }
 
 export default function GameCanvas3D() {
@@ -310,6 +249,7 @@ export default function GameCanvas3D() {
 
   const [overlayLabels, setOverlayLabels] = useState([]);
   const [overlayCashPopups, setOverlayCashPopups] = useState([]);
+  const [overlayApplianceTelemetry, setOverlayApplianceTelemetry] = useState([]);
 
   const focusedNegocioId = useGameStore((s) => s.focusedNegocioId);
   const focusedMedidorId = useGameStore((s) => s.focusedMedidorId);
@@ -464,133 +404,137 @@ export default function GameCanvas3D() {
       // Estaciones de trabajo, equipos eléctricos y materia prima según WAYPOINTS_POR_NEGOCIO
       const wps = WAYPOINTS_POR_NEGOCIO[negId] || {};
 
-      // Caja TPV en todos los negocios
+      // Helper compacto para posicionar y registrar cada aparato 3D procedural
+      const spawnMachine = (eqKey, pos, colorHexOverride = null) => {
+        const model = createApplianceModel3D(eqKey, colorHexOverride || zone.colorHex);
+        model.position.set(pos[0], pos[1], pos[2]);
+        localGroup.add(model);
+        machineGroupsRef.current[eqKey] = model;
+        return model;
+      };
+
+      // Caja TPV detallada en negocios con mostrador de cobro
+      const tpvY =
+        negId === 'hawaiian_paradise'
+          ? 1.05
+          : negId === 'imperia_uniformes' || negId === 'papeleria_imperiarte'
+            ? 1.0
+            : 0.95;
+
       if (wps.caja_tpv_vendedor) {
-        const tpvKey = negId === 'hawaiian_paradise' ? 'hp_tpv' : (negId === 'imperia_uniformes' ? 'imp_tpv' : (negId === 'papeleria_imperiarte' ? 'pap_tpv' : null));
-        const pos = new THREE.Mesh(
-          new THREE.BoxGeometry(0.46, 0.38, 0.32),
-          new THREE.MeshStandardMaterial({ color: '#0f172a', emissive: '#0284c7', emissiveIntensity: 0.35 })
-        );
-        pos.position.set(wps.caja_tpv_vendedor[0], 1.18, 0.0);
-        localGroup.add(pos);
+        const tpvKey =
+          negId === 'hawaiian_paradise'
+            ? 'hp_tpv'
+            : negId === 'imperia_uniformes'
+              ? 'imp_tpv'
+              : negId === 'papeleria_imperiarte'
+                ? 'pap_tpv'
+                : null;
         if (tpvKey) {
-          machineGroupsRef.current[tpvKey] = pos;
+          spawnMachine(tpvKey, [wps.caja_tpv_vendedor[0], tpvY, 0.0]);
+        } else {
+          const genericPos = createApplianceModel3D('hp_tpv');
+          genericPos.position.set(wps.caja_tpv_vendedor[0], tpvY, 0.0);
+          localGroup.add(genericPos);
         }
       }
 
+      // Minisplit Inverter montado en muro trasero de cada local con clima
+      const acKeyMap = {
+        hawaiian_paradise: 'hp_ac_clientes',
+        imperia_uniformes: 'imp_ac',
+        papeleria_imperiarte: 'pap_ac_18k',
+        bordados_veracruz: 'bv_ac',
+        taller_costura: 'tc_ac'
+      };
+      if (acKeyMap[negId]) {
+        spawnMachine(acKeyMap[negId], [0, 2.55, -depth / 2 + 0.30]);
+      }
+
+      if (negId === 'imperia_uniformes' && wps.caja_tpv_vendedor) {
+        spawnMachine('imp_terminal', [wps.caja_tpv_vendedor[0] - 0.50, 1.0, 0.14]);
+      }
+
       if (negId === 'hawaiian_paradise') {
-        // 1. Máquina de Raspados Hawaiian (600W)
-        const shaver = createIceShaverMachine3D();
-        shaver.position.set(wps.eq_hp_raspadora[0], 0, wps.eq_hp_raspadora[2] - 0.65);
-        localGroup.add(shaver);
-        machineGroupsRef.current.hp_raspadora = shaver;
+        spawnMachine('hp_raspadora', [wps.eq_hp_raspadora[0], 0, wps.eq_hp_raspadora[2] - 0.65], '#0284c7');
+        spawnMachine('hp_crepera', [wps.eq_hp_crepera[0], 0, wps.eq_hp_crepera[2] - 0.65]);
+        spawnMachine('hp_marquesitera', [wps.eq_hp_marquesitera[0], 0, wps.eq_hp_marquesitera[2] - 0.65]);
+        spawnMachine('hp_licuadora', [wps.eq_hp_licuadora[0], 0, wps.eq_hp_licuadora[2] - 0.65]);
+        spawnMachine('hp_breville', [wps.eq_hp_breville[0], 0, wps.eq_hp_breville[2] - 0.65]);
+        if (wps.eq_hp_tetera) {
+          spawnMachine('hp_tetera', [wps.eq_hp_tetera[0] + 0.35, 0, wps.eq_hp_tetera[2] - 0.45]);
+        }
+        if (wps.eq_hp_bano_maria) {
+          spawnMachine('hp_bano_maria', [wps.eq_hp_bano_maria[0] - 0.35, 0, wps.eq_hp_bano_maria[2]]);
+        }
 
-        // 2. Crepera Profesional (3000W)
-        const crepera = createGenericMachine3D('#f59e0b', 0.95, 0.95, 0.85, 'crepera');
-        crepera.position.set(wps.eq_hp_crepera[0], 0, wps.eq_hp_crepera[2] - 0.65);
-        localGroup.add(crepera);
-        machineGroupsRef.current.hp_crepera = crepera;
-
-        // 3. Marquesitera (1300W)
-        const marq = createGenericMachine3D('#d97706', 0.85, 1.05, 0.80);
-        marq.position.set(wps.eq_hp_marquesitera[0], 0, wps.eq_hp_marquesitera[2] - 0.65);
-        localGroup.add(marq);
-        machineGroupsRef.current.hp_marquesitera = marq;
-
-        // 4. Licuadora Ninja (2000W)
-        const blender = createGenericMachine3D('#ef4444', 0.70, 1.32, 0.70);
-        blender.position.set(wps.eq_hp_licuadora[0], 0, wps.eq_hp_licuadora[2] - 0.65);
-        localGroup.add(blender);
-        machineGroupsRef.current.hp_licuadora = blender;
-
-        // 5. Cafetera Expresso Gaggia Ruby Pro (2640W)
-        const espresso = createGenericMachine3D('#b91c1c', 1.05, 1.30, 0.80);
-        espresso.position.set(wps.eq_hp_breville[0], 0, wps.eq_hp_breville[2] - 0.65);
-        localGroup.add(espresso);
-        machineGroupsRef.current.hp_breville = espresso;
-
-        // 6. Estación de Jarabes (Limón, Fresa, Mango, Tamarindo) y Popotes
+        // Estación de Jarabes (Limón, Fresa, Mango, Tamarindo) sobre mesa inoxidable de 4 patas
         const syrupStation = new THREE.Group();
-        syrupStation.position.set(wps.raw_estacion_jarabes[0], 0.95, wps.raw_estacion_jarabes[2] - 0.35);
+        syrupStation.position.set(wps.raw_estacion_jarabes[0], 0, wps.raw_estacion_jarabes[2] - 0.35);
+        const steelStandMat = new THREE.MeshStandardMaterial({ color: '#cbd5e1', metalness: 0.6, roughness: 0.3 });
+        const topDeck = new THREE.Mesh(new THREE.BoxGeometry(0.84, 0.04, 0.42), steelStandMat);
+        topDeck.position.set(0, 0.93, 0);
+        topDeck.castShadow = true;
+        topDeck.receiveShadow = true;
+        syrupStation.add(topDeck);
+        const legOffsets = [
+          [-0.37, -0.16],
+          [0.37, -0.16],
+          [-0.37, 0.16],
+          [0.37, 0.16]
+        ];
+        legOffsets.forEach(([lx, lz]) => {
+          const leg = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.91, 0.04), steelStandMat);
+          leg.position.set(lx, 0.455, lz);
+          leg.castShadow = true;
+          syrupStation.add(leg);
+        });
         const colorsSyrup = ['#84cc16', '#ef4444', '#facc15', '#78350f'];
         colorsSyrup.forEach((col, idx) => {
           const bottle = new THREE.Mesh(
             new THREE.CylinderGeometry(0.055, 0.065, 0.28, 10),
             new THREE.MeshStandardMaterial({ color: col, roughness: 0.2 })
           );
-          bottle.position.set((idx - 1.5) * 0.16, 0.14, 0);
+          bottle.position.set((idx - 1.5) * 0.16, 0.95 + 0.14, 0);
+          bottle.castShadow = true;
           syrupStation.add(bottle);
         });
         localGroup.add(syrupStation);
 
-        // 7. Congelador de Bloques de Hielo y Refrigerador Vertical
-        const freezer = createGenericMachine3D('#38bdf8', 1.1, 1.05, 0.85);
-        freezer.position.set(wps.raw_congelador_hielo[0] - 0.4, 0, wps.raw_congelador_hielo[2] - 0.6);
-        localGroup.add(freezer);
-        machineGroupsRef.current.hp_congelador = freezer;
-
-        const fridge = createGenericMachine3D('#cbd5e1', 0.95, 1.95, 0.85);
-        fridge.position.set(wps.raw_refrigerador_insumos[0] + 0.3, 0, wps.raw_refrigerador_insumos[2] - 0.6);
-        localGroup.add(fridge);
-        machineGroupsRef.current.hp_refrigerador = fridge;
+        // Congelador de Bloques de Hielo y Refrigerador Vertical de Insumos
+        spawnMachine('hp_congelador', [wps.raw_congelador_hielo[0] - 0.4, 0, wps.raw_congelador_hielo[2] - 0.6]);
+        spawnMachine('hp_refrigerador', [wps.raw_refrigerador_insumos[0] + 0.3, 0, wps.raw_refrigerador_insumos[2] - 0.6]);
       }
 
       if (negId === 'papeleria_imperiarte') {
-        const docucolor = createGenericMachine3D('#2563eb', 1.85, 1.38, 0.90);
-        docucolor.position.set(wps.eq_pap_docucolor[0], 0, wps.eq_pap_docucolor[2] - 0.75);
-        localGroup.add(docucolor);
-        machineGroupsRef.current.pap_docucolor = docucolor;
+        spawnMachine('pap_docucolor', [wps.eq_pap_docucolor[0], 0, wps.eq_pap_docucolor[2] - 0.75]);
       }
 
       if (negId === 'bordados_veracruz') {
-        const aemco = createGenericMachine3D('#e11d48', 2.8, 1.45, 1.0);
-        aemco.position.set(wps.eq_bv_aemco_220[0], 0, wps.eq_bv_aemco_220[2] - 0.8);
-        localGroup.add(aemco);
-        machineGroupsRef.current.bv_aemco_220 = aemco;
-
-        const melco = createGenericMachine3D('#be123c', 2.6, 1.45, 1.0);
-        melco.position.set(wps.eq_bv_melco_emc[0], 0, wps.eq_bv_melco_emc[2] - 0.8);
-        localGroup.add(melco);
-        machineGroupsRef.current.bv_melco_emc = melco;
+        spawnMachine('bv_aemco_220', [wps.eq_bv_aemco_220[0], 0, wps.eq_bv_aemco_220[2] - 0.8]);
+        spawnMachine('bv_melco_emc', [wps.eq_bv_melco_emc[0], 0, wps.eq_bv_melco_emc[2] - 0.8]);
       }
 
       if (negId === 'taller_costura') {
-        const cortadora = createGenericMachine3D('#a855f7', 1.1, 1.1, 0.85);
-        cortadora.position.set(wps.eq_tc_cortadora[0], 0, wps.eq_tc_cortadora[2] - 0.7);
-        localGroup.add(cortadora);
-        machineGroupsRef.current.tc_cortadora = cortadora;
-
-        const overlock = createGenericMachine3D('#9333ea', 1.1, 1.15, 0.80);
-        overlock.position.set(wps.eq_tc_overlock_5h[0], 0, wps.eq_tc_overlock_5h[2] - 0.7);
-        localGroup.add(overlock);
-        machineGroupsRef.current.tc_overlock_5h = overlock;
-
-        const rectas = createGenericMachine3D('#7e22ce', 1.6, 1.15, 0.80);
-        rectas.position.set(wps.eq_tc_rectas_singer[0], 0, wps.eq_tc_rectas_singer[2] - 0.7);
-        localGroup.add(rectas);
-        machineGroupsRef.current.tc_rectas_singer = rectas;
-
-        const planchaVapor = createGenericMachine3D('#38bdf8', 1.0, 1.35, 0.80);
-        planchaVapor.position.set(wps.eq_tc_plancha_vapor[0] + 0.7, 0, wps.eq_tc_plancha_vapor[2]);
-        localGroup.add(planchaVapor);
-        machineGroupsRef.current.tc_plancha_vapor = planchaVapor;
+        spawnMachine('tc_cortadora', [wps.eq_tc_cortadora[0], 0, wps.eq_tc_cortadora[2] - 0.7]);
+        spawnMachine('tc_overlock_5h', [wps.eq_tc_overlock_5h[0], 0, wps.eq_tc_overlock_5h[2] - 0.7]);
+        spawnMachine('tc_rectas_singer', [wps.eq_tc_rectas_singer[0], 0, wps.eq_tc_rectas_singer[2] - 0.7]);
+        if (wps.eq_tc_collaretera_singer) {
+          spawnMachine('tc_collaretera_singer', [wps.eq_tc_collaretera_singer[0], 0, wps.eq_tc_collaretera_singer[2] - 0.7]);
+        }
+        spawnMachine('tc_plancha_vapor', [wps.eq_tc_plancha_vapor[0] + 0.7, 0, wps.eq_tc_plancha_vapor[2]]);
       }
 
       if (negId === 'taller_publi_imperia') {
-        const planchaTazas = createGenericMachine3D('#06b6d4', 0.85, 1.15, 0.75);
-        planchaTazas.position.set(wps.eq_pi_plancha_tazas[0], 0, wps.eq_pi_plancha_tazas[2] - 0.7);
-        localGroup.add(planchaTazas);
-        machineGroupsRef.current.pi_plancha_tazas = planchaTazas;
-
-        const planchaPlana = createGenericMachine3D('#0891b2', 1.1, 1.2, 0.85);
-        planchaPlana.position.set(wps.eq_pi_plancha_plana[0], 0, wps.eq_pi_plancha_plana[2] - 0.7);
-        localGroup.add(planchaPlana);
-        machineGroupsRef.current.pi_plancha_plana = planchaPlana;
-
-        const laserCnc = createGenericMachine3D('#22d3ee', 1.25, 1.05, 0.95);
-        laserCnc.position.set(wps.eq_pi_atomstack[0], 0, wps.eq_pi_atomstack[2] - 0.7);
-        localGroup.add(laserCnc);
-        machineGroupsRef.current.pi_atomstack = laserCnc;
+        if (wps.eq_pi_pc_diseno) {
+          spawnMachine('pi_pc_diseno', [wps.eq_pi_pc_diseno[0] - 0.65, 0, wps.eq_pi_pc_diseno[2]]);
+        }
+        if (wps.eq_pi_epson) {
+          spawnMachine('pi_epson', [wps.eq_pi_epson[0], 0, wps.eq_pi_epson[2] - 0.7]);
+        }
+        spawnMachine('pi_plancha_tazas', [wps.eq_pi_plancha_tazas[0], 0, wps.eq_pi_plancha_tazas[2] - 0.7]);
+        spawnMachine('pi_plancha_plana', [wps.eq_pi_plancha_plana[0], 0, wps.eq_pi_plancha_plana[2] - 0.7]);
+        spawnMachine('pi_atomstack', [wps.eq_pi_atomstack[0], 0, wps.eq_pi_atomstack[2] - 0.7]);
       }
 
       // Crear el Empleado 3D del negocio
@@ -717,35 +661,51 @@ export default function GameCanvas3D() {
       const freshGame = useGameStore.getState();
       const freshTrain = useTrainingStore.getState();
 
-      // Actualizar estados visuales de las máquinas (halos luminosos, palanca de raspadora y nieve)
+      const nowSec = now * 0.001;
+
+      // Actualizar animaciones 60 FPS de cada equipo procedural según paso activo / Entrenamiento / estado eléctrico
       Object.keys(machineGroupsRef.current).forEach((eqKey) => {
         const meshGroup = machineGroupsRef.current[eqKey];
         const eqRuntime = freshGame.equiposRuntime[eqKey];
         if (!meshGroup || !eqRuntime) return;
 
         let isWorking = eqRuntime.wattsActuales > 0 && eqRuntime.estado === 'WORK';
+        let isPreheat = eqRuntime.wattsActuales > 0 && eqRuntime.estado === 'PREHEAT';
+        let isActive = eqRuntime.wattsActuales > 0;
+        let stepCodigo = null;
+        let stepProgress = 0;
+
         if (freshTrain.isTrainingMode) {
           const rec = freshTrain.recetasEntrenadas[freshTrain.selectedProductId];
           const curStep = rec?.pasos?.[freshTrain.activeStepIndex];
-          isWorking = curStep?.equipoKey === eqKey && curStep?.estadoEquipo !== 'OFF';
+          if (curStep?.equipoKey === eqKey && curStep?.estadoEquipo !== 'OFF') {
+            isPreheat = curStep.estadoEquipo === 'PREHEAT';
+            isWorking = !isPreheat;
+            isActive = true;
+            stepCodigo = curStep.codigo || null;
+            stepProgress = Math.min(1, freshTrain.stepElapsedSec / Math.max(1, curStep.duracionSegundos || 4));
+          } else {
+            isWorking = false;
+            isPreheat = false;
+            isActive = false;
+          }
+        } else {
+          const empNeg = freshGame.empleadosPorNegocio[eqRuntime.negocioId];
+          if (empNeg && empNeg.estado === 'ATENDIENDO_CLIENTE' && empNeg.recetaActual) {
+            const empStep = empNeg.recetaActual.pasos?.[empNeg.pasoActualIndex];
+            if (empStep?.equipoKey === eqKey) {
+              stepCodigo = empStep.codigo || null;
+              stepProgress = Math.min(1, empNeg.pasoElapsedSec / Math.max(1, empStep.duracionSegundos || 4));
+            }
+          }
         }
 
-        const ring = meshGroup.getObjectByName('statusRing');
-        if (ring) {
-          ring.material.opacity = isWorking ? (0.45 + 0.25 * Math.sin(now * 0.008)) : 0.0;
-          ring.material.color.set(isWorking ? '#10b981' : '#64748b');
-        }
-
-        if (eqKey === 'hp_raspadora') {
-          const lever = meshGroup.getObjectByName('shaverLeverPivot');
-          const snow = meshGroup.getObjectByName('shaverSnowStream');
-          if (lever) {
-            lever.rotation.x = isWorking ? (0.35 + 0.08 * Math.sin(now * 0.02)) : 0;
-          }
-          if (snow) {
-            snow.visible = isWorking;
-          }
-        }
+        updateApplianceVisualState(
+          eqKey,
+          meshGroup,
+          { isWorking, isPreheat, isActive, stepCodigo, stepProgress },
+          nowSec
+        );
       });
 
       // Hacer girar los discos de los Medidores CFE según los Watts instantáneos conectados
@@ -758,8 +718,9 @@ export default function GameCanvas3D() {
         disc.rotation.y += (wattsMedidor / 1000) * dt * 2.5;
       });
 
-      // Actualizar posiciones 3D de Empleados y Clientes
+      // Actualizar posiciones 3D, orientación y gestos articulados de Empleados y Clientes
       const activeCustomerIds = new Set();
+      const tmpMachineWorldPos = new THREE.Vector3();
 
       NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
         const zone = NEGOCIOS_ZONES_3D[negId];
@@ -771,6 +732,13 @@ export default function GameCanvas3D() {
           let targetLx = empData.posicionLocal[0];
           let targetLz = empData.posicionLocal[2];
           let handItem = empData.itemEnMano;
+          let animType = empData.animacionActual || null;
+          let targetMachineKey = null;
+
+          if (empData.estado === 'ATENDIENDO_CLIENTE' && empData.recetaActual) {
+            const activeStep = empData.recetaActual.pasos?.[empData.pasoActualIndex];
+            targetMachineKey = activeStep?.equipoKey || null;
+          }
 
           // Si está activo el Modo Entrenamiento en este negocio, posicionar al empleado en el waypoint del paso entrenado
           if (freshTrain.isTrainingMode && freshTrain.selectedNegocioId === negId) {
@@ -781,12 +749,35 @@ export default function GameCanvas3D() {
             targetLx = wpCoord[0];
             targetLz = wpCoord[2];
             handItem = curStep?.itemManoVendedor || null;
+            animType = curStep?.animacionVendedor || null;
+            targetMachineKey = curStep?.equipoKey || null;
           }
 
-          empMesh.position.x += (cx + targetLx - empMesh.position.x) * 0.22;
-          empMesh.position.z += (cz + targetLz - empMesh.position.z) * 0.22;
-          empMesh.position.y = Math.abs(Math.sin(now * 0.008)) * 0.04;
+          const destX = cx + targetLx;
+          const destZ = cz + targetLz;
+          const dx = destX - empMesh.position.x;
+          const dz = destZ - empMesh.position.z;
+          const distToTarget = Math.hypot(dx, dz);
+          const isMoving = distToTarget > 0.08;
 
+          empMesh.position.x += dx * 0.22;
+          empMesh.position.z += dz * 0.22;
+          empMesh.position.y = isMoving ? Math.abs(Math.sin(nowSec * 9.0)) * 0.045 : 0;
+
+          if (isMoving) {
+            empMesh.rotation.y = lerpAngle(empMesh.rotation.y, Math.atan2(dx, dz), 0.25);
+          } else if (targetMachineKey && machineGroupsRef.current[targetMachineKey]) {
+            machineGroupsRef.current[targetMachineKey].getWorldPosition(tmpMachineWorldPos);
+            const mdx = tmpMachineWorldPos.x - empMesh.position.x;
+            const mdz = tmpMachineWorldPos.z - empMesh.position.z;
+            if (Math.hypot(mdx, mdz) > 0.05) {
+              empMesh.rotation.y = lerpAngle(empMesh.rotation.y, Math.atan2(mdx, mdz), 0.22);
+            }
+          } else {
+            empMesh.rotation.y = lerpAngle(empMesh.rotation.y, 0, 0.16);
+          }
+
+          applyEmployeeGestureAnimation(empMesh, animType, isMoving, nowSec);
           const handGroup = empMesh.getObjectByName('handItemGroup');
           updateHandItemVisual(handGroup, handItem);
         }
@@ -806,10 +797,28 @@ export default function GameCanvas3D() {
             scene.add(cliMesh);
             actorGroupsRef.current.customers[cli.id] = cliMesh;
           }
-          cliMesh.position.x += (cx + cli.posicionLocal[0] - cliMesh.position.x) * 0.22;
-          cliMesh.position.z += (cz + cli.posicionLocal[2] - cliMesh.position.z) * 0.22;
+          const cdx = cx + cli.posicionLocal[0] - cliMesh.position.x;
+          const cdz = cz + cli.posicionLocal[2] - cliMesh.position.z;
+          const cliMoving = Math.hypot(cdx, cdz) > 0.08;
+          cliMesh.position.x += cdx * 0.22;
+          cliMesh.position.z += cdz * 0.22;
+          if (cliMoving) {
+            cliMesh.rotation.y = lerpAngle(cliMesh.rotation.y, Math.atan2(cdx, cdz), 0.24);
+          } else {
+            cliMesh.rotation.y = lerpAngle(cliMesh.rotation.y, Math.PI, 0.16);
+          }
+
+          let cliHandItem = null;
+          if (cli.tieneProductoEnMano) {
+            const pId = cli.productoDeseado?.id || '';
+            if (pId === 'hp_crepa') cliHandItem = 'plated_crepa';
+            else if (pId === 'hp_espresso_americano' || pId === 'hp_cappuccino_latte') cliHandItem = 'espresso_cup';
+            else if (pId === 'pi_sub_tazas') cliHandItem = 'sublimation_mug';
+            else if (pId === 'pap_impresion_color') cliHandItem = 'paper_stack';
+            else cliHandItem = 'finished_lemon_raspado';
+          }
           const handGroup = cliMesh.getObjectByName('handItemGroup');
-          updateHandItemVisual(handGroup, cli.tieneProductoEnMano ? 'finished_lemon_raspado' : null);
+          updateHandItemVisual(handGroup, cliHandItem);
         });
       });
 
@@ -931,8 +940,98 @@ export default function GameCanvas3D() {
           }
         });
 
+        // Proyectar ventanas flotantes de telemetría eléctrica junto a cada aparato en operación
+        const nextTelemetry = [];
+        const totalKwhMesConsorcio = NEGOCIOS_ACTIVOS_IDS.reduce(
+          (acc, id) => acc + (freshGame.statsPorNegocio[id]?.kwhMes ?? freshGame.statsPorNegocio[id]?.kwhAcumulados ?? 0),
+          0
+        );
+        const reciboConsorcio = calcularCobroCFECompleto(totalKwhMesConsorcio);
+        const totalFactura = reciboConsorcio?.factura?.total || 0;
+        const tarifaEfectivaKwh =
+          totalKwhMesConsorcio > 0 && totalFactura > 0 ? totalFactura / totalKwhMesConsorcio : 1.164;
+        const machineWorldPos = new THREE.Vector3();
+
+        if (freshTrain.isTrainingMode) {
+          const rec = freshTrain.recetasEntrenadas[freshTrain.selectedProductId];
+          const curStep = rec?.pasos?.[freshTrain.activeStepIndex];
+          const eqKey = curStep?.equipoKey;
+          if (eqKey && curStep?.estadoEquipo !== 'OFF' && machineGroupsRef.current[eqKey]) {
+            const meshGroup = machineGroupsRef.current[eqKey];
+            const eqMeta = freshGame.equiposRuntime[eqKey];
+            const wattsNow = Math.round(
+              (curStep.wattsNominales || eqMeta?.wattsNominal || 0) * (curStep.factorPotencia ?? 1.0)
+            );
+            let opSec = Math.max(0, freshTrain.stepElapsedSec || 0);
+            let opKwh = (wattsNow * (opSec / 3600)) / 1000;
+            for (let idx = freshTrain.activeStepIndex - 1; idx >= 0; idx--) {
+              const prevStep = rec.pasos[idx];
+              if (!prevStep || prevStep.equipoKey !== eqKey || prevStep.estadoEquipo === 'OFF') break;
+              const prevDur = Math.max(0, parseFloat(prevStep.duracionSegundos) || 0);
+              const prevW = Math.round(
+                (prevStep.wattsNominales || eqMeta?.wattsNominal || 0) * (prevStep.factorPotencia ?? 1.0)
+              );
+              opSec += prevDur;
+              opKwh += (prevW * (prevDur / 3600)) / 1000;
+            }
+            meshGroup.getWorldPosition(machineWorldPos);
+            const screenPos = projectToScreen(
+              new THREE.Vector3(machineWorldPos.x + 0.55, machineWorldPos.y + 1.48, machineWorldPos.z)
+            );
+            if (screenPos && screenPos.x > -40 && screenPos.x < width + 40 && screenPos.y > -40 && screenPos.y < height + 40) {
+              nextTelemetry.push({
+                id: `tel_${eqKey}`,
+                eqKey,
+                nombre: APPLIANCE_SHORT_NAMES[eqKey] || eqMeta?.nombre || eqKey,
+                watts: wattsNow,
+                elapsedSec: opSec,
+                costoMxn: opKwh * tarifaEfectivaKwh,
+                estado: curStep.estadoEquipo || 'WORK',
+                x: screenPos.x,
+                y: screenPos.y
+              });
+            }
+          }
+        } else {
+          Object.keys(machineGroupsRef.current).forEach((eqKey) => {
+            const meshGroup = machineGroupsRef.current[eqKey];
+            const eq = freshGame.equiposRuntime[eqKey];
+            if (!meshGroup || !eq || eq.wattsActuales <= 0 || !eq.operacionActiva) return;
+
+            const isFocusedBusiness = freshGame.focusedNegocioId === eq.negocioId;
+            const shouldDisplay =
+              eq.rol === 'produccion' ||
+              eq.rol === 'turno_fijo' ||
+              eq.controlMode === 'MANUAL_ON' ||
+              isFocusedBusiness;
+            if (!shouldDisplay) return;
+
+            meshGroup.getWorldPosition(machineWorldPos);
+            const yOffset = eq.rol === 'clima' ? 0.35 : 1.48;
+            const screenPos = projectToScreen(
+              new THREE.Vector3(machineWorldPos.x + 0.55, machineWorldPos.y + yOffset, machineWorldPos.z)
+            );
+            if (!screenPos || screenPos.x < -40 || screenPos.x > width + 40 || screenPos.y < -40 || screenPos.y > height + 40) {
+              return;
+            }
+
+            nextTelemetry.push({
+              id: `tel_${eqKey}`,
+              eqKey,
+              nombre: APPLIANCE_SHORT_NAMES[eqKey] || eq.nombre,
+              watts: eq.wattsActuales,
+              elapsedSec: eq.segundosEnOperacionActual || 0,
+              costoMxn: (eq.kwhEnOperacionActual || 0) * tarifaEfectivaKwh,
+              estado: eq.estado,
+              x: screenPos.x,
+              y: screenPos.y
+            });
+          });
+        }
+
         setOverlayLabels(nextLabels);
         setOverlayCashPopups(nextCash);
+        setOverlayApplianceTelemetry(nextTelemetry);
       }
     };
 
@@ -963,12 +1062,53 @@ export default function GameCanvas3D() {
     while (colGroup.children.length > 0) colGroup.remove(colGroup.children[0]);
     while (navGroup.children.length > 0) navGroup.remove(navGroup.children[0]);
 
+    const EQUIPMENT_FOOTPRINT_BLOCK_IDS = new Set([
+      'col_hp_isla_trasera',
+      'col_pap_docucolor_base',
+      'col_bv_bancada_4cab',
+      'col_tc_mesa_corte',
+      'col_tc_linea_costura',
+      'col_pi_bancada_prensas'
+    ]);
+
     NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
       const zone = NEGOCIOS_ZONES_3D[negId];
       const [cx, , cz] = zone.center;
       const blocks = collisionBlocksByNegocio[negId] || [];
 
       blocks.forEach((b) => {
+        if (EQUIPMENT_FOOTPRINT_BLOCK_IDS.has(b.id) && !showCollisionBlocks) {
+          return;
+        }
+
+        if (!showCollisionBlocks && b.id?.startsWith('col_hp_mesa_')) {
+          const tableGroup = new THREE.Group();
+          tableGroup.position.set(cx + b.x, 0, cz + b.z);
+          const radius = Math.min(b.w, b.d) * 0.46;
+          const topMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(radius, radius, 0.05, 18),
+            new THREE.MeshStandardMaterial({ color: b.color || '#d97706', roughness: 0.35 })
+          );
+          topMesh.position.y = b.h - 0.025;
+          topMesh.castShadow = true;
+          topMesh.receiveShadow = true;
+          tableGroup.add(topMesh);
+
+          const metalMat = new THREE.MeshStandardMaterial({ color: '#475569', metalness: 0.6, roughness: 0.3 });
+          const post = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, b.h - 0.05, 12), metalMat);
+          post.position.y = (b.h - 0.05) / 2;
+          post.castShadow = true;
+          tableGroup.add(post);
+
+          const base = new THREE.Mesh(new THREE.CylinderGeometry(radius * 0.48, radius * 0.52, 0.03, 14), metalMat);
+          base.position.y = 0.015;
+          base.receiveShadow = true;
+          tableGroup.add(base);
+
+          colGroup.add(tableGroup);
+          return;
+        }
+
         const boxGeo = new THREE.BoxGeometry(b.w, b.h, b.d);
         const boxMat = new THREE.MeshStandardMaterial({
           color: b.color || '#d97706',
@@ -1139,6 +1279,50 @@ export default function GameCanvas3D() {
             +${Number.isInteger(cp.monto) ? cp.monto : Math.round(cp.monto)}
           </div>
         ))}
+
+        {/* Ventanas flotantes de telemetría junto a cada aparato eléctrico en funcionamiento */}
+        {overlayApplianceTelemetry.map((tel) => {
+          const isPreheat = tel.estado === 'PREHEAT';
+          return (
+            <div
+              key={tel.id}
+              data-testid={`appliance-telemetry-${tel.eqKey}`}
+              style={{
+                transform: `translate3d(${Math.round(tel.x)}px, ${Math.round(tel.y)}px, 0) translate(0%, -50%)`
+              }}
+              className={`absolute top-0 left-0 pointer-events-none select-none transition-transform duration-75 px-2 py-1.5 rounded-lg border backdrop-blur-md shadow-xl min-w-[148px] text-[10px] leading-tight ${
+                isPreheat
+                  ? 'bg-slate-950/92 border-amber-400/75 text-amber-100'
+                  : 'bg-slate-950/92 border-emerald-400/75 text-emerald-100'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2 pb-1 mb-1 border-b border-white/10">
+                <span className="font-bold text-white truncate max-w-[110px]">{tel.nombre}</span>
+                <span
+                  className={`px-1 py-0.2 rounded text-[8px] font-black tracking-wider uppercase ${
+                    isPreheat ? 'bg-amber-500/25 text-amber-300' : 'bg-emerald-500/25 text-emerald-300'
+                  }`}
+                >
+                  {isPreheat ? 'PRECAL' : 'ON'}
+                </span>
+              </div>
+              <div className="space-y-0.5 font-mono">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-400">⚡ Consumo:</span>
+                  <span className="font-bold text-amber-300">{formatWattsText(tel.watts)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-400">⏱️ Encendido:</span>
+                  <span className="font-bold text-sky-300">{formatOpDuration(tel.elapsedSec)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-slate-400">💲 Gasto op.:</span>
+                  <span className="font-bold text-emerald-300">{formatOpCostMxn(tel.costoMxn)}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

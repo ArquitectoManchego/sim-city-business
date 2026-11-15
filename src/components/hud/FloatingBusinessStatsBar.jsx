@@ -33,9 +33,10 @@ export default function FloatingBusinessStatsBar() {
     0
   );
   const reciboConsorcio = calcularCobroCFECompleto(totalKwhMesConsorcio);
+  const totalFactura = reciboConsorcio?.factura?.total || 0;
   const tarifaPromedioKwh =
-    totalKwhMesConsorcio > 0
-      ? reciboConsorcio.totalFactura / totalKwhMesConsorcio
+    totalKwhMesConsorcio > 0 && totalFactura > 0
+      ? totalFactura / totalKwhMesConsorcio
       : 1.164; // Tarifa básica 1C + 16% IVA por defecto cuando recién inicia
 
   return (

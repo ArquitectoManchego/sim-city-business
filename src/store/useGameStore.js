@@ -99,7 +99,10 @@ function buildInitialEquiposRuntime() {
       wattsActuales: Math.round(eq.wattsNominal * factorInicial),
       segundosEncendidoHoy: 0,
       segundosEncendidoTotal: 0,
-      kwhAcumulados: 0
+      kwhAcumulados: 0,
+      operacionActiva: false,
+      segundosEnOperacionActual: 0,
+      kwhEnOperacionActual: 0
     };
   });
   return runtime;
@@ -149,7 +152,11 @@ function buildInitialEmpleados() {
       clienteActualId: null,
       recetaActual: null,
       pasoActualIndex: 0,
-      pasoElapsedSec: 0
+      pasoElapsedSec: 0,
+      pasoCodigoActual: null,
+      pasoDuracionActual: 1.0,
+      animacionActual: null,
+      efectoVisualActual: null
     };
   });
   return map;
@@ -717,6 +724,10 @@ export const useGameStore = create((set, get) => ({
           clienteActivo.globoTexto = paso.dialogoCliente || null;
           emp.textoAccion = paso.dialogoVendedor || paso.titulo;
           emp.itemEnMano = paso.itemManoVendedor || null;
+          emp.pasoCodigoActual = paso.codigo || null;
+          emp.pasoDuracionActual = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
+          emp.animacionActual = paso.animacionVendedor || null;
+          emp.efectoVisualActual = paso.efectoVisual || null;
 
           // Encender el equipo eléctrico del paso si corresponde y está en modo AUTO
           if (paso.equipoKey && nextEquipos[paso.equipoKey]) {
@@ -885,6 +896,9 @@ export const useGameStore = create((set, get) => ({
                 emp.clienteActualId = null;
                 emp.recetaActual = null;
                 emp.itemEnMano = null;
+                emp.pasoCodigoActual = null;
+                emp.animacionActual = null;
+                emp.efectoVisualActual = null;
               }
             }
           }
@@ -893,6 +907,9 @@ export const useGameStore = create((set, get) => ({
         // 4. Sin clientes en cola -> Empleado ejecuta sus tareas de mantenimiento/preparación interna
         emp.estado = 'IDLE_TASK';
         emp.itemEnMano = null;
+        emp.pasoCodigoActual = null;
+        emp.animacionActual = null;
+        emp.efectoVisualActual = null;
         const listaTareas = TAREAS_SIN_CLIENTES_POR_NEGOCIO[negId] || TAREAS_SIN_CLIENTES_POR_NEGOCIO.hawaiian_paradise;
         const tarea = listaTareas[emp.idleTaskIndex % listaTareas.length];
         emp.textoAccion = tarea.texto;
@@ -923,13 +940,25 @@ export const useGameStore = create((set, get) => ({
     // 5. Integrar el consumo de energía eléctrica (Wh -> kWh) de cada aparato activo en este tick
     Object.keys(nextEquipos).forEach((eqKey) => {
       const eq = nextEquipos[eqKey];
+      const estaEnOperacion = eq.wattsActuales > 0 && (eq.estado === 'WORK' || eq.estado === 'PREHEAT');
+
       if (eq.wattsActuales > 0) {
         const deltaKwh = (eq.wattsActuales * (simDeltaSec / 3600)) / 1000;
+        const nextOpSec = estaEnOperacion
+          ? ((eq.operacionActiva ? (eq.segundosEnOperacionActual || 0) : 0) + simDeltaSec)
+          : 0;
+        const nextOpKwh = estaEnOperacion
+          ? ((eq.operacionActiva ? (eq.kwhEnOperacionActual || 0) : 0) + deltaKwh)
+          : 0;
+
         nextEquipos[eqKey] = {
           ...eq,
           segundosEncendidoHoy: eq.segundosEncendidoHoy + simDeltaSec,
           segundosEncendidoTotal: eq.segundosEncendidoTotal + simDeltaSec,
-          kwhAcumulados: eq.kwhAcumulados + deltaKwh
+          kwhAcumulados: eq.kwhAcumulados + deltaKwh,
+          operacionActiva: estaEnOperacion,
+          segundosEnOperacionActual: nextOpSec,
+          kwhEnOperacionActual: nextOpKwh
         };
         if (nextStats[eq.negocioId]) {
           nextStats[eq.negocioId] = {
@@ -939,6 +968,13 @@ export const useGameStore = create((set, get) => ({
             kwhAcumulados: nextStats[eq.negocioId].kwhAcumulados + deltaKwh
           };
         }
+      } else if (eq.operacionActiva || eq.segundosEnOperacionActual > 0 || eq.kwhEnOperacionActual > 0) {
+        nextEquipos[eqKey] = {
+          ...eq,
+          operacionActiva: false,
+          segundosEnOperacionActual: 0,
+          kwhEnOperacionActual: 0
+        };
       }
     });
 

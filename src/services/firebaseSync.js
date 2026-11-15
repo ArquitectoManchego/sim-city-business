@@ -13,6 +13,7 @@ import {
   generarSeedAparatos
 } from '../shared/firebaseBase.js';
 import { identificarNegocioDeAparato, extraerLocalYTipoLimpio } from '../shared/localHelpers.js';
+import { RECETAS_COREOGRAFICAS_DETALLADAS } from '../engine/ChoreographyRegistry.js';
 
 export {
   dbService,
@@ -44,6 +45,26 @@ try {
 }
 
 let lastWriteTs = 0;
+
+/** Descarta recetas heredadas más cortas o sin coreografía animada para conservar las definiciones locales actualizadas. */
+function sanitizeCloudRecetas(rawRecetas) {
+  if (!rawRecetas || typeof rawRecetas !== 'object') return null;
+  const cleaned = {};
+  for (const [prodId, rec] of Object.entries(rawRecetas)) {
+    const defRec = RECETAS_COREOGRAFICAS_DETALLADAS[prodId];
+    if (defRec) {
+      const defSteps = defRec.pasos || [];
+      const cloudSteps = rec?.pasos || [];
+      const defaultHasAnim = defSteps.some((p) => Boolean(p.animacionVendedor));
+      const cloudHasAnim = cloudSteps.some((p) => Boolean(p.animacionVendedor));
+      if (cloudSteps.length < defSteps.length || (defaultHasAnim && !cloudHasAnim)) {
+        continue;
+      }
+    }
+    cleaned[prodId] = rec;
+  }
+  return cleaned;
+}
 
 export const simCitySyncService = {
   /**
@@ -103,7 +124,7 @@ export const simCitySyncService = {
       medidores: Array.isArray(medidores) && medidores.length > 0 ? medidores : DEFAULT_MEDIDORES_CONSORCIO,
       aparatos: Array.isArray(aparatos) && aparatos.length > 0 ? aparatos : generarSeedAparatos(proyectoId),
       escenariosPorNegocio,
-      recetasEntrenadas,
+      recetasEntrenadas: sanitizeCloudRecetas(recetasEntrenadas),
       escena3DConfig,
       estadoInventario,
       telemetriaSim3D
@@ -216,7 +237,7 @@ export const simCitySyncService = {
         medidores: data.medidores || null,
         aparatos: data.aparatosLista || null,
         escenariosPorNegocio: data.escenariosPorNegocio || null,
-        recetasEntrenadas: data.recetasEntrenadasSim3D || null,
+        recetasEntrenadas: sanitizeCloudRecetas(data.recetasEntrenadasSim3D),
         escena3DConfig: data.escena3DConfig || null
       });
     }, (err) => {
