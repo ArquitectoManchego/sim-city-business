@@ -15,6 +15,7 @@ import TrainingModeOverlay from './components/training/TrainingModeOverlay.jsx';
 import SketchUpImporterModal from './components/editor/SketchUpImporterModal.jsx';
 import CollisionAndLayerTool from './components/editor/CollisionAndLayerTool.jsx';
 import GeniePanel from './components/ui/GeniePanel.jsx';
+import AudioBluetoothModal from './components/ui/AudioBluetoothModal.jsx';
 import { Zap, FileText, X, Activity, ChevronDown, ChevronUp } from 'lucide-react';
 
 class AppErrorBoundary extends React.Component {
@@ -63,6 +64,7 @@ export default function App() {
   const isTrainingMode = useTrainingStore((s) => s.isTrainingMode);
 
   const [isMeterCardMinimized, setIsMeterCardMinimized] = useState(false);
+  const [isAudioModalOpen, setIsAudioModalOpen] = useState(false);
 
   useEffect(() => {
     initializeFromElectricoAlacio();
@@ -106,7 +108,7 @@ export default function App() {
     <AppErrorBoundary>
       <div className="relative flex flex-col w-screen h-screen overflow-hidden bg-slate-950 select-none">
         {/* Barra Superior de Manipulación de Tiempo y Vista General en Arco */}
-        <TopTimeBar />
+        <TopTimeBar onOpenAudioModal={() => setIsAudioModalOpen(true)} />
 
         {/* Escena 3D WebGL Principal + Tira Superior de Stats Flotantes en Puro Texto */}
         <div className="relative flex-1 min-h-0 w-full overflow-hidden">
@@ -234,6 +236,7 @@ export default function App() {
         <InventoryStockDrawer />
         <MarketingCampaignModal />
         <Sims2CASModal />
+        <AudioBluetoothModal isOpen={isAudioModalOpen} onClose={() => setIsAudioModalOpen(false)} />
       </div>
     </AppErrorBoundary>
   );

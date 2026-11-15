@@ -852,9 +852,29 @@ export const useGameStore = create((set, get) => ({
   },
 
   /**
-   * Lanza inmediatamente un cliente hacia un negocio con un producto específico (ej. Raspado de Limón)
+   * Lanza inmediatamente un cliente hacia un negocio con un producto específico (ej. Raspado de Limón).
+   * Publi-Impresos, Taller de Costura y Bordados Veracruz no atienden al público en general.
    */
   spawnCustomerNow: (negocioId = 'hawaiian_paradise', productoId = null) => {
+    if (negocioId === 'publi_impresos' || negocioId === 'taller_costura' || negocioId === 'bordados_veracruz') {
+      set((state) => {
+        const simDate = new Date(state.simTimeMs);
+        return {
+          liveLogs: [
+            {
+              id: `log_no_public_${Date.now()}`,
+              fechaStr: formatDateShort(simDate),
+              horaStr: formatTimeHHMMSS(simDate),
+              negocioId,
+              tipo: 'system',
+              mensaje: `🚫 ${NEGOCIOS_ZONES_3D[negocioId]?.nombre || negocioId} es taller interno (no atiende público general; solo empleados, gerente y familia).`
+            },
+            ...state.liveLogs.slice(0, 140)
+          ]
+        };
+      });
+      return;
+    }
     set((state) => {
       const simDate = new Date(state.simTimeMs);
       const condiciones = evaluarCondicionesDemanda(simDate, state.campanasActivas, state.escenarioGlobal);
@@ -1157,21 +1177,27 @@ export const useGameStore = create((set, get) => ({
       let cola = [...(nextColas[negId] || [])].map((c) => ({ ...c }));
       const postList = [...(nextPostCompra[negId] || [])];
 
-      // 1. Spawning probabilístico de nuevos clientes
-      const lambdaHora = calcularTasaClientesPorHora(negId, condiciones, state.campanasActivas);
-      const nuevosEsperados = (lambdaHora / 3600) * simDeltaSec;
-      nextSpawnAcc[negId] = (nextSpawnAcc[negId] || 0) + nuevosEsperados;
+      // 1. Spawning probabilístico de nuevos clientes (solo en locales con atención al público)
+      const esTallerSinPublico =
+        negId === 'publi_impresos' || negId === 'taller_costura' || negId === 'bordados_veracruz';
+      if (!esTallerSinPublico) {
+        const lambdaHora = calcularTasaClientesPorHora(negId, condiciones, state.campanasActivas);
+        const nuevosEsperados = (lambdaHora / 3600) * simDeltaSec;
+        nextSpawnAcc[negId] = (nextSpawnAcc[negId] || 0) + nuevosEsperados;
 
-      if (nextSpawnAcc[negId] >= 1.0) {
-        const cantSpawn = Math.floor(nextSpawnAcc[negId]);
-        nextSpawnAcc[negId] -= cantSpawn;
-        if (cola.length < 4 + empLista.length) {
-          const nuevoCli = crearEntidadCliente(negId, condiciones);
-          cola.push(nuevoCli);
-          if (state.timeScale <= 60) {
-            pushLog(negId, 'client', `🚶 ${nuevoCli.nombre} entró a ${NEGOCIOS_ZONES_3D[negId].nombre} (Desea: ${nuevoCli.productoDeseado.nombre}).`);
+        if (nextSpawnAcc[negId] >= 1.0) {
+          const cantSpawn = Math.floor(nextSpawnAcc[negId]);
+          nextSpawnAcc[negId] -= cantSpawn;
+          if (cola.length < 4 + empLista.length) {
+            const nuevoCli = crearEntidadCliente(negId, condiciones);
+            cola.push(nuevoCli);
+            if (state.timeScale <= 60) {
+              pushLog(negId, 'client', `🚶 ${nuevoCli.nombre} entró a ${NEGOCIOS_ZONES_3D[negId].nombre} (Desea: ${nuevoCli.productoDeseado.nombre}).`);
+            }
           }
         }
+      } else if (cola.length > 0) {
+        cola = [];
       }
 
       // 2. Actualizar clientes post-compra en mesa, de pie o saliendo del local

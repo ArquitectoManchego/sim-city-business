@@ -14,6 +14,7 @@ import {
   WAYPOINTS_POR_NEGOCIO
 } from '../../engine/ChoreographyRegistry.js';
 import { isLocalPointBlocked } from '../../engine/NavMeshGrid.js';
+import { audioEngine } from '../../engine/AudioEngine.js';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { useSceneEditorStore } from '../../store/useSceneEditorStore.js';
 import { useTrainingStore } from '../../store/useTrainingStore.js';
@@ -1105,6 +1106,19 @@ export default function GameCanvas3D() {
 
       controls.update();
       renderer.render(scene, camera);
+
+      // Actualizar motor de audio espacial (música BT, ambiente de tienda/cafetería/taller y sonido real de máquinas)
+      let nearestNegId = 'hawaiian_paradise';
+      let minNegDist = Infinity;
+      Object.entries(ALL_ZONES_3D).forEach(([zId, zInfo]) => {
+        if (!zInfo?.centro) return;
+        const d = Math.hypot(controls.target.x - zInfo.centro[0], controls.target.z - zInfo.centro[2]);
+        if (d < minNegDist) {
+          minNegDist = d;
+          nearestNegId = zId;
+        }
+      });
+      audioEngine.updateFromSimulation(nowSec, nearestNegId, freshGame, freshTrain);
 
       // Actualizar etiquetas flotantes 2D proyectadas desde el mundo 3D cada ~80ms
       labelThrottle += dt;

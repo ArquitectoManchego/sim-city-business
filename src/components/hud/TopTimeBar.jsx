@@ -21,7 +21,8 @@ import {
   Gauge,
   Building2,
   ChevronDown,
-  Sparkles
+  Sparkles,
+  Bluetooth
 } from 'lucide-react';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { useTrainingStore } from '../../store/useTrainingStore.js';
@@ -29,7 +30,7 @@ import { useSceneEditorStore } from '../../store/useSceneEditorStore.js';
 import { NEGOCIOS_ZONES_3D, ALL_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
 import { evaluarCondicionesDemanda } from '../../engine/CustomerSpawner.js';
 
-export default function TopTimeBar() {
+export default function TopTimeBar({ onOpenAudioModal }) {
   const simTimeMs = useGameStore((s) => s.simTimeMs);
   const diasSimuladosCount = useGameStore((s) => s.diasSimuladosCount);
   const timeScale = useGameStore((s) => s.timeScale);
@@ -366,6 +367,16 @@ export default function TopTimeBar() {
 
         {/* Derecha: Herramientas Sims 2 CAS, Inventario, Campañas, Modelos SketchUp (.skp) y Colisiones */}
         <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            data-testid="open-audio-bt-btn"
+            onClick={() => onOpenAudioModal?.()}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-sky-600/25 hover:bg-sky-600/40 border border-sky-400/60 text-sky-200 text-[11px] font-bold transition shadow"
+            title="Música Ambiental, Spotify Connect y Receptor Bluetooth"
+          >
+            <Bluetooth className="w-3.5 h-3.5 text-sky-300" />
+            <span>Audio BT / Spotify</span>
+          </button>
+
           <button
             data-testid="open-cas-studio-btn"
             onClick={() => setCasStudioOpen(true, 'gerente')}
