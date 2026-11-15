@@ -21,7 +21,8 @@ import { calcularCobroCFECompleto } from '../../shared/simuladorCFE.js';
 import {
   createApplianceModel3D,
   updateApplianceVisualState,
-  updateHandItemVisual
+  updateHandItemVisual,
+  resolveDualHandTools
 } from './EquipmentModels3D.js';
 import {
   preloadSims2Assets,
@@ -849,10 +850,17 @@ export default function GameCanvas3D() {
           let handItem = empData.itemEnMano;
           let animType = empData.animacionActual || null;
           let targetMachineKey = null;
+          let stepCodigo = null;
+          let stepProgress = 0;
 
           if ((empData.estado === 'ATENDIENDO_CLIENTE' || empData.estado === 'ATENDIENDO_QUEUE') && empData.recetaActual) {
             const activeStep = empData.recetaActual.pasos?.[empData.pasoActualIndex];
             targetMachineKey = activeStep?.equipoKey || null;
+            stepCodigo = activeStep?.codigo || null;
+            const dur = activeStep?.duracion || 0;
+            if (dur > 0 && typeof empData.tiempoPasoRestante === 'number') {
+              stepProgress = Math.max(0, Math.min(1, 1 - empData.tiempoPasoRestante / dur));
+            }
           }
 
           // Modo Entrenamiento sobre el empleado titular (empIdx === 0)
@@ -866,6 +874,8 @@ export default function GameCanvas3D() {
             handItem = curStep?.itemManoVendedor || null;
             animType = curStep?.animacionVendedor || null;
             targetMachineKey = curStep?.equipoKey || null;
+            stepCodigo = curStep?.codigo || null;
+            stepProgress = typeof freshTrain.stepProgress === 'number' ? freshTrain.stepProgress : (nowSec * 0.14) % 1;
           }
 
           const destX = cx + targetLx;
@@ -891,9 +901,18 @@ export default function GameCanvas3D() {
             empMesh.rotation.y = lerpAngle(empMesh.rotation.y, 0, 0.16);
           }
 
-          animateSims2Actor(empMesh, animType, isMoving, nowSec);
+          animateSims2Actor(empMesh, animType, isMoving, nowSec, {
+            stepProgress,
+            stepCodigo,
+            gender: empProfile.gender,
+            negocioId: negId
+          });
+          const dualTools = resolveDualHandTools(animType, stepCodigo, handItem);
           if (empMesh.userData.rightHandSocket) {
-            updateHandItemVisual(empMesh.userData.rightHandSocket, handItem);
+            updateHandItemVisual(empMesh.userData.rightHandSocket, dualTools.rightTool);
+          }
+          if (empMesh.userData.leftHandSocket) {
+            updateHandItemVisual(empMesh.userData.leftHandSocket, dualTools.leftTool);
           }
         });
 
@@ -927,7 +946,9 @@ export default function GameCanvas3D() {
           }
 
           const isSeatedCli = !cliMoving && (cli.decisionPostCompra === 'sentado_mesa' || cli.targetWaypoint?.startsWith('mesa_'));
-          animateSims2Actor(cliMesh, isSeatedCli ? 'EAT_AT_TABLE' : null, cliMoving, nowSec);
+          animateSims2Actor(cliMesh, isSeatedCli ? 'EAT_AT_TABLE' : null, cliMoving, nowSec, {
+            gender: cliMesh.userData.profile?.gender
+          });
 
           let cliHandItem = null;
           if (cli.tieneProductoEnMano) {
@@ -989,9 +1010,15 @@ export default function GameCanvas3D() {
           mgrMesh.rotation.y = lerpAngle(mgrMesh.rotation.y, 0, 0.16);
         }
 
-        animateSims2Actor(mgrMesh, mgrData.animacionActual, mgrMoving, nowSec);
+        animateSims2Actor(mgrMesh, mgrData.animacionActual, mgrMoving, nowSec, {
+          gender: mgrProfile.gender
+        });
+        const mgrDual = resolveDualHandTools(mgrData.animacionActual, null, mgrData.itemEnMano || null);
         if (mgrMesh.userData.rightHandSocket) {
-          updateHandItemVisual(mgrMesh.userData.rightHandSocket, mgrData.itemEnMano || null);
+          updateHandItemVisual(mgrMesh.userData.rightHandSocket, mgrDual.rightTool);
+        }
+        if (mgrMesh.userData.leftHandSocket) {
+          updateHandItemVisual(mgrMesh.userData.leftHandSocket, mgrDual.leftTool);
         }
       }
 
@@ -1031,7 +1058,9 @@ export default function GameCanvas3D() {
             famMesh.rotation.y = lerpAngle(famMesh.rotation.y, 0, 0.18);
           }
 
-          animateSims2Actor(famMesh, fam.animacionActual, famMoving, nowSec);
+          animateSims2Actor(famMesh, fam.animacionActual, famMoving, nowSec, {
+            gender: famProfile.gender
+          });
         });
       }
 

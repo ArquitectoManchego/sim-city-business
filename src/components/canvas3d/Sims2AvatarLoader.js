@@ -1111,13 +1111,20 @@ function hydrateActorWithGLB(actorGroup, profile) {
     }
   });
 
-  // Ancla para accesorios sostenidos en mano derecha (tazas, crepas, bolsas, telas)
+  // Anclas para accesorios sostenidos en ambas manos (tazas, crepas, pala/rastrillo, vasos, telas)
   let rightHandSocket = null;
   if (bones.RightHand) {
     rightHandSocket = new THREE.Group();
     rightHandSocket.name = 'hand_item_socket';
     rightHandSocket.position.set(0, 0.08, 0.03);
     bones.RightHand.add(rightHandSocket);
+  }
+  let leftHandSocket = null;
+  if (bones.LeftHand) {
+    leftHandSocket = new THREE.Group();
+    leftHandSocket.name = 'left_hand_item_socket';
+    leftHandSocket.position.set(0, 0.08, 0.03);
+    bones.LeftHand.add(leftHandSocket);
   }
 
   actorGroup.add(clonedScene);
@@ -1126,6 +1133,7 @@ function hydrateActorWithGLB(actorGroup, profile) {
   actorGroup.userData.nativeHeight = entry.nativeHeight;
   actorGroup.userData.bones = bones;
   actorGroup.userData.rightHandSocket = rightHandSocket;
+  actorGroup.userData.leftHandSocket = leftHandSocket;
 
   applySims2ProfileToGroup(actorGroup, profile);
   return true;
@@ -1175,6 +1183,32 @@ const _tmpAxis = new THREE.Vector3();
 const _tmpQ1 = new THREE.Quaternion();
 const _tmpQ2 = new THREE.Quaternion();
 
+const _rigInvMat = new THREE.Matrix4();
+const _rigWorldQ = new THREE.Quaternion();
+const _rigWorldQInv = new THREE.Quaternion();
+const _parentWorldQ = new THREE.Quaternion();
+const _parentRigQ = new THREE.Quaternion();
+const _parentRigQInv = new THREE.Quaternion();
+const _qDeltaRig = new THREE.Quaternion();
+const _qLocalDelta = new THREE.Quaternion();
+const _vS = new THREE.Vector3();
+const _vF = new THREE.Vector3();
+const _vH = new THREE.Vector3();
+const _vT = new THREE.Vector3();
+const _vP = new THREE.Vector3();
+const _vE = new THREE.Vector3();
+const _vDirST = new THREE.Vector3();
+const _vPoleProj = new THREE.Vector3();
+const _vDesiredArm = new THREE.Vector3();
+const _vDesiredFore = new THREE.Vector3();
+const _vCurArm = new THREE.Vector3();
+const _vCurFore = new THREE.Vector3();
+const _vProjCur = new THREE.Vector3();
+const _vProjDes = new THREE.Vector3();
+const _vCross = new THREE.Vector3();
+const _vHandUp = new THREE.Vector3();
+const _vTargetHandUp = new THREE.Vector3();
+
 function rotateBoneModelSpace(bone, rx, ry, rz) {
   if (!bone || !bone.userData.restQuat || !bone.userData.restWorldQuatInv) return;
   bone.quaternion.copy(bone.userData.restQuat);
@@ -1196,10 +1230,165 @@ function rotateBoneModelSpace(bone, rx, ry, rz) {
   }
 }
 
+function getPosInRig(bone, rigInvMat, outVec) {
+  outVec.setFromMatrixPosition(bone.matrixWorld).applyMatrix4(rigInvMat);
+  return outVec;
+}
+
+function applyRigDeltaToBone(bone, qDeltaRig, rigWorldQInv) {
+  bone.parent.getWorldQuaternion(_parentWorldQ);
+  _parentRigQ.multiplyQuaternions(rigWorldQInv, _parentWorldQ);
+  _parentRigQInv.copy(_parentRigQ).invert();
+  _qLocalDelta.multiplyQuaternions(_parentRigQInv, qDeltaRig).multiply(_parentRigQ);
+  bone.quaternion.premultiply(_qLocalDelta);
+}
+
 /**
- * Máquina de Animación Esquelética (67 huesos) para caminata, raspadora, crepera, costura, TPV, comida, TV y celular
+ * Solver analítico de 2 huesos (IK en espacio nativo de rigRoot) para posicionar
+ * LeftHand / RightHand exactamente en coordenadas [x, y, z] sin T-pose ni torsiones.
  */
-export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving = false, nowSec = 0) {
+function solveArmIKCharacterSpace(
+  rigRoot,
+  sideSign, // +1 = Left (+X), -1 = Right (-X)
+  armBone,
+  foreArmBone,
+  handBone,
+  targetX,
+  targetY,
+  targetZ,
+  poleX,
+  poleY,
+  poleZ,
+  handMode = 'natural'
+) {
+  if (!rigRoot || !armBone || !foreArmBone || !handBone) return;
+  if (!armBone.userData.restQuat || !foreArmBone.userData.restQuat) return;
+
+  armBone.quaternion.copy(armBone.userData.restQuat);
+  foreArmBone.quaternion.copy(foreArmBone.userData.restQuat);
+  if (handBone.userData.restQuat) {
+    handBone.quaternion.copy(handBone.userData.restQuat);
+  }
+
+  rigRoot.updateMatrixWorld(true);
+  _rigInvMat.copy(rigRoot.matrixWorld).invert();
+  rigRoot.getWorldQuaternion(_rigWorldQ);
+  _rigWorldQInv.copy(_rigWorldQ).invert();
+
+  getPosInRig(armBone, _rigInvMat, _vS);
+  getPosInRig(foreArmBone, _rigInvMat, _vF);
+  getPosInRig(handBone, _rigInvMat, _vH);
+
+  const l1 = _vS.distanceTo(_vF);
+  const l2 = _vF.distanceTo(_vH);
+  if (l1 < 0.02 || l2 < 0.02) return;
+
+  _vT.set(targetX, targetY, targetZ);
+  _vP.set(poleX, poleY, poleZ);
+
+  _vDirST.subVectors(_vT, _vS);
+  const rawDist = _vDirST.length();
+  const minDist = Math.abs(l1 - l2) + 0.02;
+  const maxDist = l1 + l2 - 0.004;
+  const d = THREE.MathUtils.clamp(rawDist, minDist, maxDist);
+  if (rawDist > 1e-5) {
+    _vDirST.divideScalar(rawDist);
+  } else {
+    _vDirST.set(0, -1, 0);
+  }
+
+  const cosAlpha = THREE.MathUtils.clamp((l1 * l1 + d * d - l2 * l2) / (2 * l1 * d), -1, 1);
+  const sinAlpha = Math.sqrt(Math.max(0, 1 - cosAlpha * cosAlpha));
+
+  _vPoleProj.subVectors(_vP, _vS);
+  const projDot = _vPoleProj.dot(_vDirST);
+  _vPoleProj.addScaledVector(_vDirST, -projDot);
+  if (_vPoleProj.lengthSq() < 1e-6) {
+    _vPoleProj.set(sideSign * 0.25, 0, -1);
+    const pDot = _vPoleProj.dot(_vDirST);
+    _vPoleProj.addScaledVector(_vDirST, -pDot);
+  }
+  _vPoleProj.normalize();
+
+  _vE
+    .copy(_vS)
+    .addScaledVector(_vDirST, l1 * cosAlpha)
+    .addScaledVector(_vPoleProj, l1 * sinAlpha);
+
+  _vDesiredArm.subVectors(_vE, _vS).normalize();
+  _vDesiredFore.subVectors(_vT, _vE).normalize();
+
+  // 1. Alinear Arm hacia el codo objetivo E
+  _vCurArm.subVectors(_vF, _vS).normalize();
+  _qDeltaRig.setFromUnitVectors(_vCurArm, _vDesiredArm);
+  applyRigDeltaToBone(armBone, _qDeltaRig, _rigWorldQInv);
+
+  // 2. Twist de Arm para que el plano del codo apunte exactamente hacia T
+  armBone.updateMatrixWorld(true);
+  getPosInRig(foreArmBone, _rigInvMat, _vF);
+  getPosInRig(handBone, _rigInvMat, _vH);
+  _vCurFore.subVectors(_vH, _vF).normalize();
+
+  _vProjCur.copy(_vCurFore).addScaledVector(_vDesiredArm, -_vCurFore.dot(_vDesiredArm));
+  _vProjDes.copy(_vDesiredFore).addScaledVector(_vDesiredArm, -_vDesiredFore.dot(_vDesiredArm));
+  if (_vProjCur.lengthSq() > 1e-5 && _vProjDes.lengthSq() > 1e-5) {
+    _vProjCur.normalize();
+    _vProjDes.normalize();
+    const dot = THREE.MathUtils.clamp(_vProjCur.dot(_vProjDes), -1, 1);
+    _vCross.crossVectors(_vProjCur, _vProjDes);
+    const sinSign = _vCross.dot(_vDesiredArm) >= 0 ? 1 : -1;
+    const twistAngle = Math.acos(dot) * sinSign;
+    if (Math.abs(twistAngle) > 1e-4) {
+      _qDeltaRig.setFromAxisAngle(_vDesiredArm, twistAngle);
+      applyRigDeltaToBone(armBone, _qDeltaRig, _rigWorldQInv);
+    }
+  }
+
+  // 3. Alinear ForeArm hacia la mano objetivo T
+  armBone.updateMatrixWorld(true);
+  getPosInRig(foreArmBone, _rigInvMat, _vF);
+  getPosInRig(handBone, _rigInvMat, _vH);
+  _vCurFore.subVectors(_vH, _vF).normalize();
+  _qDeltaRig.setFromUnitVectors(_vCurFore, _vDesiredFore);
+  applyRigDeltaToBone(foreArmBone, _qDeltaRig, _rigWorldQInv);
+
+  // 4. Orientación de muñeca según la acción (vertical para vaso, inclinada para verter, etc.)
+  if (handMode !== 'natural') {
+    foreArmBone.updateMatrixWorld(true);
+    handBone.getWorldQuaternion(_parentWorldQ);
+    _parentRigQ.multiplyQuaternions(_rigWorldQInv, _parentWorldQ);
+    _vHandUp.copy(_axisY).applyQuaternion(_parentRigQ).normalize();
+
+    if (handMode === 'upright') {
+      _vTargetHandUp.set(0, 1, 0.08).normalize();
+    } else if (handMode === 'pour_left') {
+      _vTargetHandUp.set(0.72, 0.48, 0.45).normalize();
+    } else if (handMode === 'rake_down') {
+      _vTargetHandUp.set(0.15, -0.35, 0.92).normalize();
+    } else if (handMode === 'waist') {
+      _vTargetHandUp.set(-sideSign * 0.65, -0.65, 0.35).normalize();
+    } else if (handMode === 'ear_phone') {
+      _vTargetHandUp.set(0.28, 0.92, 0.15).normalize();
+    } else {
+      _vTargetHandUp.copy(_vHandUp);
+    }
+
+    _qDeltaRig.setFromUnitVectors(_vHandUp, _vTargetHandUp);
+    applyRigDeltaToBone(handBone, _qDeltaRig, _rigWorldQInv);
+  }
+}
+
+/**
+ * Máquina de Animación Esquelética (67 huesos) con Solver Bimanual IK en espacio de personaje
+ * para caminata, postura frente al cliente, raspadora, crepera, costura, TPV, comida, TV y celular.
+ */
+export function animateSims2Actor(
+  actorGroup,
+  animType = 'IDLE_WAIT',
+  isMoving = false,
+  nowSec = 0,
+  animMeta = null
+) {
   if (!actorGroup) return;
 
   // Animar Plumbob y Aura en todos los frames
@@ -1209,7 +1398,7 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
     const floorRing = auraGroup.getObjectByName('aura_floor_ring');
     const halo = auraGroup.getObjectByName('aura_body_column');
     if (plumbob) {
-      const baseY = Math.max(1.45, ((actorGroup.userData.profile?.heightCm || 170) / 100) + 0.34);
+      const baseY = Math.max(1.45, (actorGroup.userData.profile?.heightCm || 170) / 100 + 0.34);
       plumbob.position.y = baseY + Math.sin(nowSec * 3.1) * 0.05;
       plumbob.rotation.y = nowSec * 1.9;
     }
@@ -1222,8 +1411,9 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
     }
   }
 
+  const rigRoot = actorGroup.userData.rigRoot;
   const bones = actorGroup.userData.bones;
-  if (!bones) return;
+  if (!bones || !rigRoot) return;
 
   const {
     Hips,
@@ -1232,13 +1422,20 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
     Head,
     LeftArm,
     LeftForeArm,
+    LeftHand,
     RightArm,
     RightForeArm,
+    RightHand,
     LeftUpLeg,
     LeftLeg,
     RightUpLeg,
     RightLeg
   } = bones;
+
+  const profile = actorGroup.userData.profile || {};
+  const isFemale = (animMeta?.gender || profile.gender) === 'F';
+  const stepProgress = THREE.MathUtils.clamp(animMeta?.stepProgress ?? 0, 0, 1);
+  const stepCodigo = animMeta?.stepCodigo || '';
 
   // Reset de posición vertical de cadera
   if (Hips && Hips.userData.restPos) {
@@ -1248,7 +1445,7 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
   // Parpadeo orgánico Sims 2 cada ~3.8 segundos
   const blinkPhase = nowSec % 3.8;
   const blinkVal = blinkPhase > 3.66 ? Math.sin(((blinkPhase - 3.66) / 0.14) * Math.PI) : 0;
-  actorGroup.userData.rigRoot?.traverse((m) => {
+  rigRoot.traverse((m) => {
     if (m.isSkinnedMesh && m.name.includes('Head') && m.morphTargetDictionary && m.morphTargetInfluences) {
       const biL = m.morphTargetDictionary.eyeBlinkLeft;
       const biR = m.morphTargetDictionary.eyeBlinkRight;
@@ -1257,15 +1454,20 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
     }
   });
 
-  // Ángulos base de postura A -> postura relajada (bajar brazos junto al tronco)
-  let lArmRx = 0, lArmRy = 0, lArmRz = 0.56; // +Z baja LeftArm pegado al cuerpo
-  let rArmRx = 0, rArmRy = 0, rArmRz = -0.56; // -Z baja RightArm pegado al cuerpo
-  let lForeRx = -0.14, lForeRy = 0, lForeRz = 0;
-  let rForeRx = -0.14, rForeRy = 0, rForeRz = 0;
+  // Valores por defecto de torso, cabeza y piernas
   let lLegRx = 0, rLegRx = 0, lKneeRx = 0, rKneeRx = 0;
   let spineRx = 0, spineRy = 0, spineRz = 0;
   let headRx = 0, headRy = 0;
   let hipDropY = 0;
+
+  // Objetivos por defecto de manos en espacio nativo de rigRoot (~1.76m):
+  // Brazos relajados rectos hacia abajo junto al cuerpo (NUNCA T-pose abierta)
+  let lHand = [0.18, 0.85, 0.03];
+  let rHand = [-0.18, 0.85, 0.03];
+  let lPole = [0.30, 1.12, -0.25];
+  let rPole = [-0.30, 1.12, -0.25];
+  let lHandMode = 'natural';
+  let rHandMode = 'natural';
 
   if (isMoving) {
     const stride = nowSec * 7.8;
@@ -1274,14 +1476,15 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
     rLegRx = legSwing;
     lKneeRx = Math.max(0, Math.sin(stride) * 0.52);
     rKneeRx = Math.max(0, -Math.sin(stride) * 0.52);
-
-    // Brazos opuestos al paso (-X hacia adelante)
-    lArmRx = -legSwing * 0.65;
-    rArmRx = legSwing * 0.65;
-    lForeRx = -0.25 - Math.max(0, -lArmRx) * 0.4;
-    rForeRx = -0.25 - Math.max(0, -rArmRx) * 0.4;
     hipDropY = -Math.abs(Math.cos(stride)) * 0.025;
     spineRy = Math.sin(stride) * 0.07;
+
+    // Balanceo natural de brazos pegados al costado opuesto a cada zancada
+    const armSwing = Math.sin(stride) * 0.19;
+    lHand = [0.19, 0.87 + Math.abs(armSwing) * 0.14, 0.03 + armSwing];
+    rHand = [-0.19, 0.87 + Math.abs(armSwing) * 0.14, 0.03 - armSwing];
+    lPole = [0.27, 1.12, -0.26 - Math.max(0, armSwing) * 0.35];
+    rPole = [-0.27, 1.12, -0.26 - Math.max(0, -armSwing) * 0.35];
   } else if (
     animType === 'EAT_AT_TABLE' ||
     animType === 'WATCH_YOUTUBE' ||
@@ -1293,123 +1496,283 @@ export function animateSims2Actor(actorGroup, animType = 'IDLE_WAIT', isMoving =
     rLegRx = -1.48;
     lKneeRx = 1.48;
     rKneeRx = 1.48;
+
     if (animType === 'EAT_AT_TABLE') {
-      const spoon = Math.sin(nowSec * 3.6);
-      lArmRx = -0.52;
-      lArmRz = 0.25;
-      lForeRx = -0.95;
-      rArmRx = -0.58 + spoon * 0.14;
-      rArmRz = -0.25;
-      rForeRx = -0.92 - spoon * 0.28;
-      headRx = 0.12 - spoon * 0.08;
+      const spoon = Math.sin(nowSec * 3.4);
+      const lift = Math.max(0, spoon);
+      spineRx = 0.08;
+      lHand = [0.16, 0.82, 0.28];
+      rHand = [-0.10, 0.84 + lift * 0.30, 0.28 - lift * 0.08];
+      lPole = [0.30, 0.96, -0.10];
+      rPole = [-0.30, 0.96, -0.10];
+      headRx = 0.12 - lift * 0.08;
     } else if (animType === 'WATCH_YOUTUBE') {
-      // Sostiene teléfono frente a la cara sentado
-      spineRx = 0.12;
-      lArmRx = -0.78;
-      lArmRz = 0.18;
-      lForeRx = -1.18;
-      rArmRx = -0.82;
-      rArmRz = -0.18;
-      rForeRx = -1.24;
-      headRx = 0.34;
+      spineRx = 0.10;
+      lHand = [0.06, 0.98, 0.27];
+      rHand = [-0.06, 0.98, 0.27];
+      lPole = [0.26, 0.95, 0.0];
+      rPole = [-0.26, 0.95, 0.0];
+      headRx = 0.28;
     } else {
       // Sofá viendo Smart TV en oficina con clima
-      spineRx = -0.12;
-      lArmRx = -0.35;
-      lArmRz = 0.32;
-      lForeRx = -0.95;
-      rArmRx = -0.35;
-      rArmRz = -0.32;
-      rForeRx = -0.95;
-      headRx = -0.05;
+      spineRx = -0.10;
+      lHand = [0.22, 0.78, 0.20];
+      rHand = [-0.22, 0.78, 0.20];
+      lPole = [0.34, 0.96, -0.15];
+      rPole = [-0.34, 0.96, -0.15];
+      headRx = -0.04;
       headRy = Math.sin(nowSec * 0.8) * 0.08;
     }
+  } else if (animType === 'TALK_CLIENT') {
+    // Frente a un cliente: posturas de vendedor experimentado (brazos a la altura de la cintura
+    // gesticulando como orador), alternando en mujeres con manos en la cintura.
+    const cycle = nowSec * 0.45;
+    const isFemaleWaistPhase = isFemale && Math.sin(cycle) > 0.35;
+    spineRx = 0.04;
+    headRx = Math.sin(nowSec * 1.8) * 0.05;
+    headRy = Math.sin(nowSec * 1.1) * 0.10;
+
+    if (isFemaleWaistPhase) {
+      // Mano izquierda en la cintura, mano derecha gesticulando suavemente al hablar
+      lHand = [0.15, 1.03, 0.02];
+      lPole = [0.36, 1.15, -0.06];
+      lHandMode = 'waist';
+      const g = Math.sin(nowSec * 3.8);
+      rHand = [-0.16 + Math.cos(nowSec * 2.6) * 0.05, 1.09 + g * 0.04, 0.26 + Math.sin(nowSec * 2.2) * 0.04];
+      rPole = [-0.30, 1.10, -0.08];
+    } else {
+      // Orador / vendedor experimentado: manos a la altura de la cintura en movimiento expresivo
+      const gL = Math.sin(nowSec * 3.6);
+      const gR = Math.sin(nowSec * 3.6 + 1.1);
+      lHand = [0.17 + Math.cos(nowSec * 2.3) * 0.04, 1.08 + gL * 0.045, 0.26 + Math.sin(nowSec * 2.0) * 0.04];
+      rHand = [-0.17 - Math.cos(nowSec * 2.5) * 0.04, 1.08 + gR * 0.045, 0.26 + Math.cos(nowSec * 2.1) * 0.04];
+      lPole = [0.30, 1.10, -0.10];
+      rPole = [-0.30, 1.10, -0.10];
+    }
   } else if (animType === 'CRANK_LEFT_HANDLE') {
-    const crank = nowSec * 8.2;
-    spineRx = 0.14;
-    lArmRx = -1.05 + Math.sin(crank) * 0.28;
-    lArmRz = 0.22 + Math.cos(crank) * 0.16;
-    lForeRx = -1.1 + Math.cos(crank) * 0.22;
-    rArmRx = -0.85;
-    rArmRz = -0.22;
-    rForeRx = -0.85;
-    headRx = 0.15;
-  } else if (
-    animType === 'POUR_BATTER' ||
-    animType === 'SPREAD_INGREDIENTS' ||
-    animType === 'FOLD_AND_PLATE' ||
-    animType === 'IRON_PRESS'
-  ) {
-    const circ = nowSec * 5.2;
-    spineRx = 0.16;
-    lArmRx = -0.72;
-    lArmRz = 0.28;
-    lForeRx = -0.75;
-    rArmRx = -0.88 + Math.sin(circ) * 0.16;
-    rArmRz = -0.26 + Math.cos(circ) * 0.22;
-    rForeRx = -0.82 - Math.abs(Math.cos(circ)) * 0.25;
-    headRx = 0.20;
-  } else if (animType === 'OPERATE_TPV' || animType === 'DESIGN_PC' || animType === 'SEW_MACHINE') {
-    const typePulse = Math.sin(nowSec * 14.0) * 0.06;
-    spineRx = 0.08;
-    lArmRx = -0.68 + typePulse;
-    lArmRz = 0.24;
-    lForeRx = -1.05 - typePulse;
-    rArmRx = -0.68 - typePulse;
-    rArmRz = -0.24;
-    rForeRx = -1.05 + typePulse;
+    // RASPADORA: mano izquierda mueve la manivela MUY LENTAMENTE solo ~3 cm (0.03m) en total
+    // durante toda la presión; mano derecha sostiene el vaso COMPLETAMENTE VERTICAL debajo del hueco.
+    spineRx = 0.09;
     headRx = 0.14;
-    headRy = Math.sin(nowSec * 1.4) * 0.10;
-  } else if (animType === 'PHONE_CALL') {
-    // Brazo derecho levantado sosteniendo celular junto a la oreja
-    rArmRx = -1.18;
-    rArmRz = -0.16;
-    rForeRx = -1.55;
-    lArmRz = 0.52;
-    headRx = Math.sin(nowSec * 2.5) * 0.06;
-    headRy = -0.14 + Math.sin(nowSec * 1.3) * 0.12;
-  } else if (animType === 'SWEEP_MOP') {
-    const sw = Math.sin(nowSec * 4.4);
-    spineRx = 0.18;
-    spineRy = sw * 0.18;
-    lArmRx = -0.75 + sw * 0.18;
-    lArmRz = 0.22;
-    lForeRx = -0.65;
-    rArmRx = -0.85 - sw * 0.18;
-    rArmRz = -0.18;
-    rForeRx = -0.58;
+    const crankDrop = stepProgress > 0 ? stepProgress * 0.03 : ((Math.sin(nowSec * 0.6) + 1) * 0.5) * 0.03;
+    lHand = [0.20, 1.25 - crankDrop, 0.30];
+    lPole = [0.36, 1.22, -0.02];
+    rHand = [-0.08, 1.02, 0.34];
+    rPole = [-0.28, 1.08, 0.02];
+    rHandMode = 'upright';
+  } else if (animType === 'PRESS_RIGHT_SWITCH') {
+    // Botón de encendido/apagado al lado derecho de la raspadora
+    spineRx = 0.06;
+    headRx = 0.10;
+    const pressZ = 0.32 + Math.sin(nowSec * 5.0) * 0.02;
+    rHand = [-0.18, 1.15, pressZ];
+    rPole = [-0.34, 1.16, -0.05];
+    lHand = [0.16, 0.96, 0.18];
+    lPole = [0.28, 1.10, -0.16];
+  } else if (animType === 'POUR_BATTER') {
+    // CREPERA PASO 1: mano derecha vierte la mezcla sobre la crepera mientras
+    // mano izquierda permanece sosteniendo la pala (crepe_rake) al lado lista para esparcir.
+    spineRx = 0.12;
+    headRx = 0.18;
+    const pourWobble = Math.sin(nowSec * 3.0) * 0.015;
+    rHand = [-0.04 + pourWobble, 1.19, 0.36];
+    rPole = [-0.28, 1.16, 0.02];
+    rHandMode = 'pour_left';
+    lHand = [0.21, 1.03, 0.26];
+    lPole = [0.34, 1.10, -0.08];
+  } else if (animType === 'CIRCULAR_RAKE') {
+    // CREPERA PASO 2: la mano izquierda toma protagonismo y gira la pala en un movimiento
+    // circular continuo esparciendo adecuadamente la masa sobre toda la crepera.
+    spineRx = 0.14;
+    headRx = 0.20;
+    const theta = nowSec * 5.2;
+    const radius = 0.125;
+    lHand = [0.02 + Math.cos(theta) * radius, 1.02, 0.35 + Math.sin(theta) * radius];
+    lPole = [0.28, 1.12, 0.02];
+    lHandMode = 'rake_down';
+    rHand = [-0.19, 0.90, 0.12];
+    rPole = [-0.30, 1.10, -0.20];
+  } else if (animType === 'SPREAD_INGREDIENTS') {
+    // Untar Nutella/jarabe/toppings o depilar vinil
+    spineRx = 0.12;
+    headRx = 0.18;
+    if (stepCodigo === 'POUR_SYRUP_FLAVOR' || stepCodigo === 'ADD_SYRUP') {
+      // Raspado: mano izquierda carga el vaso vertical y derecha vierte el jarabe
+      lHand = [0.09, 1.03, 0.28];
+      lPole = [0.28, 1.08, -0.06];
+      lHandMode = 'upright';
+      const swirl = nowSec * 4.0;
+      rHand = [-0.05 + Math.cos(swirl) * 0.035, 1.21, 0.30 + Math.sin(swirl) * 0.035];
+      rPole = [-0.28, 1.16, 0.0];
+      rHandMode = 'pour_left';
+    } else {
+      const brush = Math.sin(nowSec * 5.2) * 0.09;
+      lHand = [0.16, 1.00, 0.26];
+      lPole = [0.30, 1.10, -0.08];
+      rHand = [-0.05 + brush, 1.02, 0.34 + Math.cos(nowSec * 5.2) * 0.04];
+      rPole = [-0.28, 1.12, -0.04];
+    }
+  } else if (animType === 'FOLD_CREPA' || animType === 'FOLD_AND_PLATE') {
+    // Doblar crepa o enrollar marquesita con ambas manos coordinadas sobre la plancha
+    spineRx = 0.12;
+    headRx = 0.18;
+    const fold = Math.sin(nowSec * 3.8) * 0.05;
+    lHand = [0.10 - fold, 1.03, 0.33];
+    rHand = [-0.10 + fold, 1.03, 0.34];
+    lPole = [0.30, 1.12, -0.04];
+    rPole = [-0.30, 1.12, -0.04];
+  } else if (animType === 'WAIT_HEATING' || animType === 'WAIT_COOKING') {
+    // Espera activa frente a máquina: postura natural o manos en cintura / pala lista
+    const breath = Math.sin(nowSec * 2.0) * 0.012;
+    spineRx = 0.03;
+    headRx = 0.08;
+    if (stepCodigo === 'WAIT_HEATING' || stepCodigo === 'PREHEAT_CREPERA') {
+      // Sostiene pala en izquierda esperando que caliente la crepera
+      lHand = [0.19, 0.99 + breath, 0.21];
+      rHand = [-0.18, 0.86 + breath, 0.05];
+    } else if (isFemale) {
+      lHand = [0.15, 1.03, 0.02];
+      rHand = [-0.15, 1.03, 0.02];
+      lPole = [0.34, 1.15, -0.08];
+      rPole = [-0.34, 1.15, -0.08];
+      lHandMode = 'waist';
+      rHandMode = 'waist';
+    } else {
+      lHand = [0.18, 0.92 + breath, 0.16];
+      rHand = [-0.18, 0.92 + breath, 0.16];
+    }
+  } else if (animType === 'OPERATE_TPV' || animType === 'DESIGN_PC') {
+    // Teclado + Mouse / TPV
+    const typeL = Math.sin(nowSec * 13.0) * 0.015;
+    const typeR = Math.cos(nowSec * 12.0) * 0.018;
+    spineRx = 0.07;
+    headRx = 0.14;
+    headRy = Math.sin(nowSec * 1.3) * 0.08;
+    lHand = [0.11, 0.99 + typeL, 0.29];
+    rHand = [-0.15 + typeR, 0.99, 0.28];
+    lPole = [0.28, 1.08, -0.06];
+    rPole = [-0.28, 1.08, -0.06];
+  } else if (animType === 'SEW_MACHINE') {
+    // Costura bimanual guiando tela frente a la aguja
+    const feed = Math.sin(nowSec * 8.0) * 0.015;
+    spineRx = 0.14;
     headRx = 0.22;
+    lHand = [0.10, 0.98, 0.33 + feed];
+    rHand = [-0.10, 0.98, 0.33 - feed];
+    lPole = [0.29, 1.08, -0.06];
+    rPole = [-0.29, 1.08, -0.06];
+  } else if (animType === 'CUT_FABRIC') {
+    // Mano izquierda presiona tela firme; mano derecha empuja cortadora de disco hacia adelante
+    spineRx = 0.15;
+    headRx = 0.20;
+    const cutSlide = ((nowSec * 0.55) % 1) * 0.18;
+    lHand = [0.14, 0.99, 0.31];
+    rHand = [-0.08, 0.99, 0.24 + cutSlide];
+    lPole = [0.30, 1.12, -0.06];
+    rPole = [-0.28, 1.12, -0.06];
+  } else if (animType === 'IRON_PRESS') {
+    // Planchado de vapor o cierre de plancha térmica plana
+    spineRx = 0.12;
+    headRx = 0.16;
+    const glide = Math.sin(nowSec * 4.2) * 0.11;
+    lHand = [0.14, 1.00, 0.28];
+    rHand = [-0.06 + glide, 1.02, 0.33];
+    lPole = [0.30, 1.12, -0.06];
+    rPole = [-0.28, 1.14, -0.04];
+  } else if (animType === 'PHONE_CALL') {
+    // Mano derecha en la oreja sosteniendo celular; brazo izquierdo relajado recto hacia abajo
+    rHand = [-0.14, 1.54, 0.05];
+    rPole = [-0.26, 1.24, 0.16];
+    rHandMode = 'ear_phone';
+    lHand = [0.18, 0.85, 0.03];
+    lPole = [0.28, 1.12, -0.25];
+    headRx = Math.sin(nowSec * 2.4) * 0.04;
+    headRy = -0.10 + Math.sin(nowSec * 1.2) * 0.08;
+  } else if (animType === 'SWEEP_MOP') {
+    // Agarre diagonal de escoba/trapeador remando en vaivén
+    const sw = Math.sin(nowSec * 4.2) * 0.14;
+    spineRx = 0.14;
+    spineRy = sw * 0.8;
+    headRx = 0.20;
+    lHand = [0.06 + sw, 0.94, 0.31];
+    rHand = [-0.05 + sw * 0.5, 1.18, 0.25];
+    lPole = [0.28, 1.08, -0.08];
+    rPole = [-0.28, 1.22, -0.08];
   } else if (animType === 'CARRY_BOWL' || animType === 'CARRY_PLATE') {
-    lArmRx = -0.55;
-    lArmRz = 0.24;
-    lForeRx = -1.08;
-    rArmRx = -0.55;
-    rArmRz = -0.24;
-    rForeRx = -1.08;
+    // Cargar charola/plato/prenda frente al cuerpo con antebrazos nivelados
+    const stepBob = Math.sin(nowSec * 4.0) * 0.01;
+    lHand = [0.14, 1.00 + stepBob, 0.28];
+    rHand = [-0.14, 1.00 + stepBob, 0.28];
+    lPole = [0.28, 1.10, -0.12];
+    rPole = [-0.28, 1.10, -0.12];
+    lHandMode = 'upright';
+    rHandMode = 'upright';
   } else {
-    // Idle orgánico con respiración y micro-gestos
-    const breath = Math.sin(nowSec * 2.0);
-    lArmRz = 0.56 + breath * 0.02;
-    rArmRz = -0.56 - breath * 0.02;
-    spineRx = breath * 0.02;
-    headRy = Math.sin(nowSec * 0.85) * 0.12;
-    headRx = Math.sin(nowSec * 1.2) * 0.04;
+    // IDLE_WAIT / Espera tranquila:
+    // Mujeres pueden descansar con manos en la cintura periódicamente; hombres o postura base,
+    // brazos rectos relajados hacia abajo pegados al cuerpo.
+    const breath = Math.sin(nowSec * 2.0) * 0.01;
+    spineRx = breath * 0.8;
+    headRy = Math.sin(nowSec * 0.85) * 0.10;
+    headRx = Math.sin(nowSec * 1.2) * 0.035;
+
+    if (isFemale && Math.sin(nowSec * 0.28) > 0.2) {
+      lHand = [0.15, 1.03 + breath * 0.3, 0.02];
+      rHand = [-0.15, 1.03 + breath * 0.3, 0.02];
+      lPole = [0.35, 1.15, -0.07];
+      rPole = [-0.35, 1.15, -0.07];
+      lHandMode = 'waist';
+      rHandMode = 'waist';
+    } else {
+      lHand = [0.18, 0.85 + breath, 0.03];
+      rHand = [-0.18, 0.85 + breath, 0.03];
+      lPole = [0.28, 1.12, -0.25];
+      rPole = [-0.28, 1.12, -0.25];
+    }
   }
 
   if (Hips && Hips.userData.restPos && Math.abs(hipDropY) > 0.001) {
-    Hips.position.y = Hips.userData.restPos.y + hipDropY / (actorGroup.userData.rigRoot?.scale?.y || 1);
+    Hips.position.y = Hips.userData.restPos.y + hipDropY / (rigRoot.scale?.y || 1);
   }
 
+  // 1. Aplicar rotaciones de torso, cabeza y piernas
   rotateBoneModelSpace(Hips, 0, spineRy * 0.3, 0);
   rotateBoneModelSpace(Spine, spineRx * 0.5, spineRy * 0.5, spineRz);
   rotateBoneModelSpace(Spine2, spineRx * 0.5, spineRy * 0.5, 0);
   rotateBoneModelSpace(Head, headRx, headRy, 0);
-  rotateBoneModelSpace(LeftArm, lArmRx, lArmRy, lArmRz);
-  rotateBoneModelSpace(LeftForeArm, lForeRx, lForeRy, lForeRz);
-  rotateBoneModelSpace(RightArm, rArmRx, rArmRy, rArmRz);
-  rotateBoneModelSpace(RightForeArm, rForeRx, rForeRy, rForeRz);
   rotateBoneModelSpace(LeftUpLeg, lLegRx, 0, 0);
   rotateBoneModelSpace(LeftLeg, lKneeRx, 0, 0);
   rotateBoneModelSpace(RightUpLeg, rLegRx, 0, 0);
   rotateBoneModelSpace(RightLeg, rKneeRx, 0, 0);
+
+  // 2. Resolver cadenas anatómicas de ambos brazos con IK exacto en espacio de personaje
+  solveArmIKCharacterSpace(
+    rigRoot,
+    1,
+    LeftArm,
+    LeftForeArm,
+    LeftHand,
+    lHand[0],
+    lHand[1],
+    lHand[2],
+    lPole[0],
+    lPole[1],
+    lPole[2],
+    lHandMode
+  );
+  solveArmIKCharacterSpace(
+    rigRoot,
+    -1,
+    RightArm,
+    RightForeArm,
+    RightHand,
+    rHand[0],
+    rHand[1],
+    rHand[2],
+    rPole[0],
+    rPole[1],
+    rPole[2],
+    rHandMode
+  );
 }
+

@@ -1065,9 +1065,12 @@ export function updateApplianceVisualState(eqKey, meshGroup, stateInfo, nowSec) 
 
     if (crank) {
       if (isShaving) {
-        crank.rotation.x = nowSec * 7.5;
+        // Avance muy lento (~3 cm de recorrido total de manivela durante los 10-15s de raspado)
+        crank.rotation.x = 0.22 + stepProgress * 0.28;
       } else if (isReloading) {
         crank.rotation.x = -stepProgress * Math.PI * 2;
+      } else {
+        crank.rotation.x = 0.22;
       }
     }
 
@@ -1288,6 +1291,9 @@ export function updateHandItemVisual(handItemGroup, itemType) {
     } else {
       addPart(handItemGroup, new THREE.CylinderGeometry(0.04, 0.04, 0.20, 10), matStandard(0x22c55e, 0.2, 0.1), [-0.14, 0.16, 0.04], [0, 0, -0.8]);
     }
+  } else if (itemType === 'syrup_bottle') {
+    addPart(handItemGroup, new THREE.CylinderGeometry(0.042, 0.042, 0.21, 10), matStandard(0x22c55e, 0.2, 0.1), [0, 0.06, 0.03], [0.75, 0, 0]);
+    addPart(handItemGroup, new THREE.CylinderGeometry(0.012, 0.022, 0.05, 8), matStandard(0xf8fafc, 0.3, 0.05), [0, 0.14, 0.11], [0.75, 0, 0]);
   } else if (itemType === 'sublimation_mug') {
     addPart(handItemGroup, new THREE.CylinderGeometry(0.065, 0.065, 0.15, 12), matStandard(0xf8fafc), [0, 0.02, 0.05]);
   } else if (itemType === 'paper_stack' || itemType === 'ticket') {
@@ -1302,3 +1308,29 @@ export function updateHandItemVisual(handItemGroup, itemType) {
     addPart(handItemGroup, new THREE.BoxGeometry(0.20, 0.24, 0.14), matStandard(0xf59e0b, 0.6, 0.0), [0, -0.02, 0]);
   }
 }
+
+/**
+ * Resuelve simultáneamente el accesorio de mano derecha y mano izquierda según la coreografía activa.
+ */
+export function resolveDualHandTools(animType, stepCodigo, baseRightItem) {
+  if (animType === 'POUR_BATTER' || stepCodigo === 'POUR_BATTER_ON_PLATE') {
+    return { rightTool: 'batter_bowl_tilted', leftTool: 'crepe_rake' };
+  }
+  if (animType === 'CIRCULAR_RAKE' || stepCodigo === 'SPREAD_BATTER_CIRCULAR') {
+    return { rightTool: null, leftTool: 'crepe_rake' };
+  }
+  if (stepCodigo === 'WAIT_HEATING' || stepCodigo === 'PREHEAT_CREPERA') {
+    return { rightTool: null, leftTool: 'crepe_rake' };
+  }
+  if (animType === 'CRANK_LEFT_HANDLE' || stepCodigo === 'PUSH_LEVER_SHAVE_ICE' || stepCodigo === 'SHAVE_ICE') {
+    return { rightTool: 'shaved_ice_cup', leftTool: null };
+  }
+  if (stepCodigo === 'POUR_SYRUP_FLAVOR' || stepCodigo === 'ADD_SYRUP') {
+    return { rightTool: 'syrup_bottle', leftTool: 'shaved_ice_cup' };
+  }
+  if (animType === 'FOLD_CREPA' || stepCodigo === 'FOLD_AND_PLATE_CREPA') {
+    return { rightTool: 'metal_spatula', leftTool: null };
+  }
+  return { rightTool: baseRightItem || null, leftTool: null };
+}
+
