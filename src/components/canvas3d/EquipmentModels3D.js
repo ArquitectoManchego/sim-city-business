@@ -193,49 +193,220 @@ function buildCrepera3D() {
   return g;
 }
 
+function createLabeledPlaneTexture(width, height, drawFn) {
+  if (typeof document === 'undefined') return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  drawFn(ctx, width, height);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 function buildIceShaver3D(colorHex) {
   const g = new THREE.Group();
-  const inoxMat = matStandard(0xdbeafe, 0.28, 0.85);
-  const accentMat = matStandard(colorHex || 0x0284c7, 0.3, 0.2);
+  const inoxMat = matStandard(0xcbd5e1, 0.30, 0.86);
+  const darkInoxMat = matStandard(0x334155, 0.45, 0.75);
+  const whiteFrameMat = matStandard(0xf1f5f9, 0.35, 0.12);
+  const motorMat = matStandard(0x94a3b8, 0.32, 0.82);
+  const cableMat = matStandard(0x18181b, 0.75, 0.1);
 
-  addOpenInoxTable(g, 0.96, 0.78, 0.86, 0x64748b, 0xdbeafe, 0.24);
-  addPart(g, new THREE.BoxGeometry(0.56, 0.28, 0.52), accentMat, [0, 1.00, 0]);
-  addPart(g, new THREE.BoxGeometry(0.16, 0.62, 0.36), accentMat, [-0.18, 1.42, -0.04]);
+  // Mesa de trabajo abierta de 4 patas en acero inoxidable (suficiente espacio bajo la salida derecha)
+  addOpenInoxTable(g, 1.42, 0.88, 0.72, 0x64748b, 0xdbeafe, 0.22);
 
-  // Acrylic hopper + ice block
-  addPart(g, new THREE.CylinderGeometry(0.18, 0.18, 0.48, 18), matStandard(0xbae6fd, 0.1, 0.05, { transparent: true, opacity: 0.48 }), [0.06, 1.38, 0.04]);
-  addPart(g, new THREE.CylinderGeometry(0.13, 0.135, 0.30, 12), matStandard(0xe0f2fe, 0.15, 0.1, { transparent: true, opacity: 0.88 }), [0.06, 1.36, 0.04], [0, 0, 0], 'shaverIceBlock');
+  // Dos patas metálicas tipo trineo en "U" que elevan la raspadora sobre la mesa (y = 0.72 -> 1.00)
+  [-0.45, 0.24].forEach((lx) => {
+    addPart(g, new THREE.BoxGeometry(0.055, 0.03, 0.44), inoxMat, [lx, 0.735, 0]);
+    addPart(g, new THREE.BoxGeometry(0.055, 0.28, 0.045), inoxMat, [lx, 0.86, 0.20]);
+    addPart(g, new THREE.BoxGeometry(0.055, 0.28, 0.045), inoxMat, [lx, 0.86, -0.20]);
+  });
 
-  // Press lever pivot with vibrant yellow knob
-  const leverPivot = new THREE.Group();
-  leverPivot.name = 'shaverLeverPivot';
-  leverPivot.position.set(0.06, 1.66, -0.06);
-  addPart(leverPivot, new THREE.BoxGeometry(0.05, 0.05, 0.50), inoxMat, [0, 0.05, 0.20]);
-  addPart(leverPivot, new THREE.CylinderGeometry(0.038, 0.038, 0.14, 12), matStandard(0xfacc15), [0, 0.05, 0.46], [0, 0, Math.PI / 2]);
-  g.add(leverPivot);
+  // Gabinete horizontal de acero inoxidable (x: -0.56 a +0.44, y: 1.00 a 1.34, z: -0.23 a +0.23)
+  // Construido con cámara frontal hueca para ver por la ventana el bloque de hielo y la barra empujadora
+  addPart(g, new THREE.BoxGeometry(1.00, 0.05, 0.46), inoxMat, [-0.06, 1.315, 0]); // Techo
+  addPart(g, new THREE.BoxGeometry(1.00, 0.045, 0.46), inoxMat, [-0.06, 1.022, 0]); // Piso
+  addPart(g, new THREE.BoxGeometry(1.00, 0.25, 0.06), darkInoxMat, [-0.06, 1.17, -0.20]); // Fondo cámara
+  addPart(g, new THREE.BoxGeometry(0.06, 0.25, 0.46), inoxMat, [-0.53, 1.17, 0]); // Pared izquierda
+  addPart(g, new THREE.BoxGeometry(0.28, 0.25, 0.46), inoxMat, [0.30, 1.17, 0]); // Pared / caja derecha (interruptor y ducto)
 
+  // Cabezal de cuchillas giratorias en el costado derecho de la cámara interior (x = +0.15)
+  const bladesDrum = new THREE.Group();
+  bladesDrum.name = 'shaverBladesDrum';
+  bladesDrum.position.set(0.15, 1.17, 0);
+  addPart(bladesDrum, new THREE.CylinderGeometry(0.105, 0.105, 0.03, 16), matStandard(0xe2e8f0, 0.2, 0.92), [0, 0, 0], [0, 0, Math.PI / 2]);
+  for (let b = 0; b < 4; b++) {
+    const ang = (b * Math.PI) / 2;
+    addPart(
+      bladesDrum,
+      new THREE.BoxGeometry(0.025, 0.19, 0.018),
+      matStandard(0xf8fafc, 0.15, 0.95),
+      [0, Math.sin(ang) * 0.01, Math.cos(ang) * 0.01],
+      [ang, 0, 0]
+    );
+  }
+  g.add(bladesDrum);
+
+  // Barra dentada empujadora interna + placa compresora (se desplaza de izquierda a derecha)
+  const pusherGroup = new THREE.Group();
+  pusherGroup.name = 'shaverPusherGroup';
+  pusherGroup.position.set(-0.28, 1.16, 0);
+  addPart(pusherGroup, new THREE.BoxGeometry(0.03, 0.18, 0.25), matStandard(0xe2e8f0, 0.25, 0.9), [0, 0, 0]); // Placa empuje
+  addPart(pusherGroup, new THREE.BoxGeometry(0.56, 0.036, 0.036), matStandard(0x94a3b8, 0.35, 0.85), [-0.28, 0, 0]); // Vástago horizontal
+  g.add(pusherGroup);
+
+  // Bloque de hielo interior (anclado contra las cuchillas en x = +0.135; se encoge con cada raspado de 10 -> 0)
+  const iceMat = matStandard(colorHex ? 0xbaf2ff : 0xe0f2fe, 0.10, 0.12, {
+    transparent: true,
+    opacity: 0.92,
+    emissive: 0x38bdf8,
+    emissiveIntensity: 0.22
+  });
+  const iceBlock = addPart(g, new THREE.BoxGeometry(1.0, 0.19, 0.24), iceMat, [-0.06, 1.14, 0], [0, 0, 0], 'shaverIceBlock');
+  iceBlock.scale.set(0.39, 1, 1);
+
+  // Compuerta frontal central abatible con marco blanco biselado, manija superior y ventana con logo
+  const doorPivot = new THREE.Group();
+  doorPivot.name = 'shaverDoorPivot';
+  doorPivot.position.set(-0.17, 1.03, 0.235);
+  // Marco blanco (superior, inferior, izquierdo, derecho)
+  addPart(doorPivot, new THREE.BoxGeometry(0.62, 0.042, 0.035), whiteFrameMat, [0, 0.228, 0.012]);
+  addPart(doorPivot, new THREE.BoxGeometry(0.62, 0.042, 0.035), whiteFrameMat, [0, 0.021, 0.012]);
+  addPart(doorPivot, new THREE.BoxGeometry(0.048, 0.25, 0.035), whiteFrameMat, [-0.286, 0.124, 0.012]);
+  addPart(doorPivot, new THREE.BoxGeometry(0.048, 0.25, 0.035), whiteFrameMat, [0.286, 0.124, 0.012]);
+  // Manija superior y bisagras inferiores
+  addPart(doorPivot, new THREE.BoxGeometry(0.11, 0.018, 0.025), darkInoxMat, [0, 0.228, 0.038]);
+  addPart(doorPivot, new THREE.CylinderGeometry(0.01, 0.01, 0.04, 8), darkInoxMat, [-0.18, 0.002, 0.02], [0, 0, Math.PI / 2]);
+  addPart(doorPivot, new THREE.CylinderGeometry(0.01, 0.01, 0.04, 8), darkInoxMat, [0.18, 0.002, 0.02], [0, 0, Math.PI / 2]);
+
+  // Cristal frontal transparente con leyenda HAWAIIAN PARADISE / DURANGO MEXICO
+  const doorTex = createLabeledPlaneTexture(256, 96, (ctx, w, h) => {
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(186, 230, 253, 0.18)';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = 'rgba(226, 232, 240, 0.72)';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(46, 28);
+    ctx.lineTo(w - 46, 28);
+    ctx.lineTo(w - 64, h - 28);
+    ctx.lineTo(64, h - 28);
+    ctx.closePath();
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(248, 250, 252, 0.92)';
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.fillText('HAWAIIAN', w / 2, 46);
+    ctx.fillText('PARADISE', w / 2, 66);
+    ctx.font = 'bold 10px sans-serif';
+    ctx.fillText('DURANGO            MEXICO', w / 2, 82);
+  });
+  const glassMat = doorTex
+    ? new THREE.MeshStandardMaterial({ map: doorTex, transparent: true, roughness: 0.12, metalness: 0.1 })
+    : matStandard(0xbae6fd, 0.1, 0.1, { transparent: true, opacity: 0.25 });
+  addPart(doorPivot, new THREE.PlaneGeometry(0.525, 0.168), glassMat, [0, 0.124, 0.022]);
+  g.add(doorPivot);
+
+  // LADO IZQUIERDO: Manivela giratoria que empuja la barra interna contra las cuchillas
+  const crankPivot = new THREE.Group();
+  crankPivot.name = 'shaverCrankPivot';
+  crankPivot.position.set(-0.56, 1.17, 0.04);
+  addPart(crankPivot, new THREE.CylinderGeometry(0.02, 0.02, 0.08, 10), inoxMat, [-0.03, 0, 0], [0, 0, Math.PI / 2]);
+  addPart(crankPivot, new THREE.BoxGeometry(0.022, 0.24, 0.032), inoxMat, [-0.065, -0.10, 0.03], [0.22, 0, 0]);
+  addPart(crankPivot, new THREE.CylinderGeometry(0.018, 0.018, 0.13, 10), matStandard(0xe2e8f0, 0.2, 0.9), [-0.13, -0.20, 0.05], [0, 0, Math.PI / 2]);
+  g.add(crankPivot);
+
+  // CUBIERTA SUPERIOR CENTRO: Volante auxiliar de ajuste con poste y cable enrollado
+  addPart(g, new THREE.CylinderGeometry(0.06, 0.075, 0.03, 14), darkInoxMat, [-0.14, 1.355, -0.02]);
+  addPart(g, new THREE.CylinderGeometry(0.018, 0.018, 0.14, 10), darkInoxMat, [-0.14, 1.43, -0.02]);
+  addPart(g, new THREE.TorusGeometry(0.095, 0.018, 8, 18), motorMat, [-0.14, 1.50, -0.02], [Math.PI / 2, 0, 0]);
+  addPart(g, new THREE.TorusGeometry(0.10, 0.018, 8, 16), cableMat, [-0.16, 1.36, 0.06], [Math.PI / 2, 0, 0]);
+
+  // LADO DERECHO SUPERIOR: Motor eléctrico de inducción 600W + capacitor + placa amarilla + cable
+  addPart(g, new THREE.BoxGeometry(0.30, 0.03, 0.24), darkInoxMat, [0.26, 1.355, -0.02]);
+  const motorBarrel = addPart(g, new THREE.CylinderGeometry(0.135, 0.135, 0.28, 18), motorMat, [0.26, 1.49, -0.02], [0, 0, Math.PI / 2]);
+  motorBarrel.name = 'shaverMotorBarrel';
+  addPart(g, new THREE.BoxGeometry(0.14, 0.06, 0.09), motorMat, [0.26, 1.635, -0.02]); // Capacitor superior
+  addPart(g, new THREE.BoxGeometry(0.12, 0.07, 0.01), matStandard(0xfacc15, 0.4, 0.1), [0.26, 1.50, 0.116]); // Placa amarilla
+  // Cable hacia la caja del interruptor derecho
+  addPart(g, new THREE.CylinderGeometry(0.014, 0.014, 0.26, 8), cableMat, [0.24, 1.34, 0.20], [0.45, 0, -0.25]);
+
+  // EXTREMO DERECHO: Guarda vertical de acero inoxidable para banda y polea
+  addPart(g, new THREE.BoxGeometry(0.13, 0.68, 0.24), inoxMat, [0.495, 1.32, -0.02]);
+
+  // LADO DERECHO FRONTAL: Botón de Encendido y Apagado + Letrero PELIGRO + Hueco inferior de salida
+  addPart(g, new THREE.BoxGeometry(0.14, 0.14, 0.07), whiteFrameMat, [0.30, 1.18, 0.26]); // Caja interruptor
+  addPart(g, new THREE.BoxGeometry(0.042, 0.07, 0.025), matStandard(0x22c55e, 0.4, 0.1), [0.275, 1.18, 0.295], [0, 0, 0], 'shaverBtnOn');
+  addPart(g, new THREE.BoxGeometry(0.042, 0.07, 0.025), matStandard(0xef4444, 0.4, 0.1), [0.325, 1.18, 0.295], [0, 0, 0], 'shaverBtnOff');
+  attachLedIndicator(g, [0.30, 1.265, 0.285], 0.02);
+
+  // Ducto vertical derecho debajo del botón con letrero "PELIGRO NO" y boquilla inferior de salida de hielo
+  addPart(g, new THREE.BoxGeometry(0.13, 0.18, 0.13), inoxMat, [0.30, 0.99, 0.25]);
+  const signTex = createLabeledPlaneTexture(128, 160, (ctx, w, h) => {
+    ctx.fillStyle = '#f8fafc';
+    ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 6;
+    ctx.strokeRect(3, 3, w - 6, h - 6);
+    ctx.fillStyle = '#dc2626';
+    ctx.font = 'bold 22px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('PELIGRO', w / 2, 30);
+    ctx.beginPath();
+    ctx.arc(w / 2, 74, 28, 0, Math.PI * 2);
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 7;
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(w / 2 - 20, 54);
+    ctx.lineTo(w / 2 + 20, 94);
+    ctx.stroke();
+    ctx.fillStyle = '#0f172a';
+    ctx.font = 'bold 28px sans-serif';
+    ctx.fillText('NO', w / 2, 136);
+  });
+  addPart(
+    g,
+    new THREE.PlaneGeometry(0.11, 0.145),
+    signTex ? new THREE.MeshStandardMaterial({ map: signTex, roughness: 0.4 }) : matStandard(0xdc2626),
+    [0.30, 0.99, 0.318]
+  );
+  // Hueco inferior por donde cae el hielo triturado
+  addPart(g, new THREE.CylinderGeometry(0.048, 0.048, 0.025, 14), darkInoxMat, [0.30, 0.895, 0.25], [0, 0, 0], 'shaverExitHole');
+
+  // ABAJO DEL HUECO DERECHO: Chorro de hielo triturado y vaso receptor con nieve progresiva (0% -> 100%)
   const snowStream = addPart(
     g,
-    new THREE.ConeGeometry(0.068, 0.28, 12),
-    new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.88 }),
-    [0.06, 1.02, 0.28],
+    new THREE.CylinderGeometry(0.022, 0.046, 0.16, 12),
+    new THREE.MeshBasicMaterial({ color: 0xf8fafc, transparent: true, opacity: 0.92 }),
+    [0.30, 0.82, 0.25],
     [0, 0, 0],
     'shaverSnowStream'
   );
   snowStream.visible = false;
 
-  const cupUnder = addPart(
-    g,
-    new THREE.CylinderGeometry(0.08, 0.058, 0.16, 14),
-    matStandard(0xe0f2fe, 0.2, 0.05),
-    [0.06, 0.94, 0.28],
-    [0, 0, 0],
-    'shaverCupUnder'
+  const cupGroup = new THREE.Group();
+  cupGroup.name = 'shaverCupUnder';
+  cupGroup.position.set(0.30, 0.72, 0.25);
+  addPart(
+    cupGroup,
+    new THREE.CylinderGeometry(0.068, 0.048, 0.145, 14),
+    matStandard(0xe0f2fe, 0.15, 0.05, { transparent: true, opacity: 0.72 }),
+    [0, 0.0725, 0]
   );
-  cupUnder.visible = false;
+  const snowFill = new THREE.Group();
+  snowFill.name = 'shaverSnowFill';
+  addPart(snowFill, new THREE.CylinderGeometry(0.062, 0.045, 0.135, 14), matStandard(0xffffff, 0.95, 0.0), [0, 0.068, 0]);
+  addPart(snowFill, new THREE.SphereGeometry(0.062, 12, 10), matStandard(0xffffff, 0.95, 0.0), [0, 0.135, 0]);
+  snowFill.scale.set(1, 0.04, 1);
+  cupGroup.add(snowFill);
+  cupGroup.visible = false;
+  g.add(cupGroup);
 
-  attachLedIndicator(g, [0.22, 1.02, 0.27], 0.025);
-  attachStatusRing(g, 0.72);
+  attachStatusRing(g, 0.78);
   return g;
 }
 
@@ -689,7 +860,7 @@ export function createApplianceModel3D(eqKey, colorHex) {
  */
 export function updateApplianceVisualState(eqKey, meshGroup, stateInfo, nowSec) {
   if (!meshGroup) return;
-  const { isWorking, isPreheat, isActive, stepCodigo, stepProgress = 0 } = stateInfo;
+  const { isWorking, isPreheat, isActive, stepCodigo, stepProgress = 0, iceBlockRatio = 1 } = stateInfo;
 
   const ring = meshGroup.getObjectByName('statusRing');
   if (ring?.material) {
@@ -810,16 +981,88 @@ export function updateApplianceVisualState(eqKey, meshGroup, stateInfo, nowSec) 
     return;
   }
 
-  // 2. Ice Shaver animations
+  // 2. Ice Shaver horizontal mechanics (manivela izquierda, barra empujadora, desgaste 10 raspados, motor y vaso bajo salida)
   if (eqKey === 'hp_raspadora') {
-    const lever = meshGroup.getObjectByName('shaverLeverPivot');
+    const crank = meshGroup.getObjectByName('shaverCrankPivot');
+    const door = meshGroup.getObjectByName('shaverDoorPivot');
+    const pusher = meshGroup.getObjectByName('shaverPusherGroup');
+    const blades = meshGroup.getObjectByName('shaverBladesDrum');
+    const btnOn = meshGroup.getObjectByName('shaverBtnOn');
+    const btnOff = meshGroup.getObjectByName('shaverBtnOff');
     const snow = meshGroup.getObjectByName('shaverSnowStream');
     const cup = meshGroup.getObjectByName('shaverCupUnder');
+    const snowFill = meshGroup.getObjectByName('shaverSnowFill');
     const ice = meshGroup.getObjectByName('shaverIceBlock');
-    if (lever) lever.rotation.x = isWorking ? 0.34 + Math.sin(nowSec * 12) * 0.05 : 0;
-    if (snow) snow.visible = isWorking && stepCodigo === 'SHAVE_ICE';
-    if (cup) cup.visible = ['PLACE_CUP', 'SHAVE_ICE'].includes(stepCodigo);
-    if (ice) ice.rotation.y = isWorking ? nowSec * 9.0 : 0;
+
+    const activeStep = stepCodigo || '';
+    const isShaving = activeStep === 'PUSH_LEVER_SHAVE_ICE' || activeStep === 'SHAVE_ICE';
+    const isReloading = activeStep === 'INSERT_ICE_BLOCK';
+    const isPlacingCup = activeStep === 'PLACE_CUP_UNDER_SPOUT' || activeStep === 'PLACE_CUP';
+    const isTurningOff = activeStep === 'TURN_OFF_SHAVER';
+
+    if (door) {
+      door.rotation.x = isReloading ? Math.sin(Math.min(1, stepProgress) * Math.PI) * 1.05 : 0;
+    }
+
+    if (blades) {
+      if (isWorking) blades.rotation.x = nowSec * 18.0;
+    }
+
+    if (crank) {
+      if (isShaving) {
+        crank.rotation.x = nowSec * 7.5;
+      } else if (isReloading) {
+        crank.rotation.x = -stepProgress * Math.PI * 2;
+      }
+    }
+
+    const baseRatio = Math.max(0, Math.min(1, iceBlockRatio));
+    const effectiveRatio = isReloading
+      ? stepProgress > 0.35 ? 1.0 : 0.0
+      : isShaving
+        ? Math.max(0.02, baseRatio - 0.10 * stepProgress)
+        : baseRatio;
+
+    const maxIceWidth = 0.39;
+    const xRightBlades = 0.135;
+    const currentWidth = Math.max(0.015, maxIceWidth * effectiveRatio);
+
+    if (ice) {
+      ice.visible = effectiveRatio > 0.015;
+      if (ice.visible) {
+        ice.scale.set(currentWidth, 1, 1);
+        ice.position.x = xRightBlades - currentWidth / 2;
+      }
+    }
+
+    if (pusher) {
+      pusher.position.x = isReloading
+        ? -0.34
+        : effectiveRatio <= 0.015
+          ? xRightBlades - 0.025
+          : xRightBlades - currentWidth - 0.018;
+    }
+
+    if (btnOn) btnOn.position.z = isWorking ? 0.286 : 0.295;
+    if (btnOff) btnOff.position.z = isWorking ? 0.295 : 0.287;
+
+    if (snow) {
+      snow.visible = isShaving;
+      if (snow.visible) {
+        const pulse = 0.9 + Math.sin(nowSec * 22.0) * 0.16;
+        snow.scale.set(pulse, 0.92 + Math.cos(nowSec * 18.0) * 0.08, pulse);
+      }
+    }
+
+    if (cup) {
+      cup.visible = isPlacingCup || isShaving || isTurningOff;
+    }
+
+    if (snowFill) {
+      const fillRatio = isShaving ? Math.max(0.05, stepProgress) : isTurningOff ? 1.0 : 0.02;
+      snowFill.visible = fillRatio > 0.04;
+      snowFill.scale.set(1, fillRatio, 1);
+    }
     return;
   }
 

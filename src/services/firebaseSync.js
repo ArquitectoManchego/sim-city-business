@@ -46,7 +46,7 @@ try {
 
 let lastWriteTs = 0;
 
-/** Descarta recetas heredadas más cortas o sin coreografía animada para conservar las definiciones locales actualizadas. */
+/** Descarta recetas heredadas desactualizadas para conservar las definiciones locales actualizadas. */
 function sanitizeCloudRecetas(rawRecetas) {
   if (!rawRecetas || typeof rawRecetas !== 'object') return null;
   const cleaned = {};
@@ -57,7 +57,9 @@ function sanitizeCloudRecetas(rawRecetas) {
       const cloudSteps = rec?.pasos || [];
       const defaultHasAnim = defSteps.some((p) => Boolean(p.animacionVendedor));
       const cloudHasAnim = cloudSteps.some((p) => Boolean(p.animacionVendedor));
-      if (cloudSteps.length < defSteps.length || (defaultHasAnim && !cloudHasAnim)) {
+      const staleRaspado =
+        prodId === 'hp_raspado' && !cloudSteps.some((p) => p.animacionVendedor === 'CRANK_LEFT_HANDLE');
+      if (cloudSteps.length < defSteps.length || (defaultHasAnim && !cloudHasAnim) || staleRaspado) {
         continue;
       }
     }

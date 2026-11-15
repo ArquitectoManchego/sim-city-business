@@ -102,7 +102,8 @@ function buildInitialEquiposRuntime() {
       kwhAcumulados: 0,
       operacionActiva: false,
       segundosEnOperacionActual: 0,
-      kwhEnOperacionActual: 0
+      kwhEnOperacionActual: 0,
+      ...(key === 'hp_raspadora' ? { raspadosRestantesHielo: 10, maxRaspadosPorBloque: 10 } : {})
     };
   });
   return runtime;
@@ -772,6 +773,29 @@ export const useGameStore = create((set, get) => ({
                 }
               }
 
+              // Actualizar desgaste real de bloque de hielo (1 bloque = 10 raspados)
+              if (paso.codigo === 'INSERT_ICE_BLOCK' && nextEquipos.hp_raspadora) {
+                const maxRasp = nextEquipos.hp_raspadora.maxRaspadosPorBloque || 10;
+                nextEquipos.hp_raspadora = {
+                  ...nextEquipos.hp_raspadora,
+                  raspadosRestantesHielo: maxRasp
+                };
+                pushLog(negId, 'stock', `🧊 Bloque de hielo nuevo cargado en raspadora (${maxRasp}/${maxRasp} raspados).`);
+              } else if (
+                (paso.codigo === 'PUSH_LEVER_SHAVE_ICE' || paso.codigo === 'SHAVE_ICE') &&
+                nextEquipos.hp_raspadora
+              ) {
+                const prevRasp = nextEquipos.hp_raspadora.raspadosRestantesHielo ?? 10;
+                const rem = Math.max(0, prevRasp - 1);
+                nextEquipos.hp_raspadora = {
+                  ...nextEquipos.hp_raspadora,
+                  raspadosRestantesHielo: rem
+                };
+                if (rem === 0) {
+                  pushLog(negId, 'info', '🧊 Bloque de hielo agotado tras 10 raspados; el siguiente cliente requerirá recarga.');
+                }
+              }
+
               // Detectar si el sub-paso que acaba de concluir es el pago en caja TPV
               const esPasoPago =
                 paso.waypointCliente === 'caja_tpv_cliente' ||
@@ -794,6 +818,16 @@ export const useGameStore = create((set, get) => ({
               if (emp.pasoActualIndex + 1 < pasos.length) {
                 emp.pasoActualIndex += 1;
                 emp.pasoElapsedSec = 0;
+
+                // Si aún queda hielo en cámara (> 0 de 10 raspados), omitir recarga e ir directo al botón ON
+                const nextPasoCheck = pasos[emp.pasoActualIndex];
+                if (
+                  nextPasoCheck?.codigo === 'INSERT_ICE_BLOCK' &&
+                  (nextEquipos.hp_raspadora?.raspadosRestantesHielo ?? 10) > 0 &&
+                  emp.pasoActualIndex + 1 < pasos.length
+                ) {
+                  emp.pasoActualIndex += 1;
+                }
 
                 // En Imperia Uniformes: verificar si tras el probador (paso 3) el cliente decide NO comprar
                 if (

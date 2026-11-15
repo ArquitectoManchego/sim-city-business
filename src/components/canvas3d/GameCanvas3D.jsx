@@ -216,6 +216,12 @@ function applyEmployeeGestureAnimation(empMesh, animType, isMoving, nowSec) {
     leftPivot.rotation.set(-0.82, 0, 0.14);
     rightPivot.rotation.set(-0.82, 0, -0.14);
     if (handGroup) handGroup.position.set(0, 0.96, 0.42);
+  } else if (animType === 'CRANK_LEFT_HANDLE') {
+    leftPivot.rotation.set(-1.12 + Math.sin(nowSec * 7.5) * 0.42, 0, -0.22 + Math.cos(nowSec * 7.5) * 0.25);
+    rightPivot.rotation.set(-0.58, 0, -0.10);
+  } else if (animType === 'PRESS_RIGHT_SWITCH') {
+    leftPivot.rotation.set(-0.25, 0, 0);
+    rightPivot.rotation.set(-1.05 + Math.sin(nowSec * 6.0) * 0.12, 0, -0.22);
   } else if (animType === 'OPERATE_TPV') {
     leftPivot.rotation.set(-0.25, 0, 0);
     rightPivot.rotation.set(-0.95 + Math.sin(nowSec * 9.0) * 0.15, 0, 0);
@@ -456,7 +462,7 @@ export default function GameCanvas3D() {
       }
 
       if (negId === 'hawaiian_paradise') {
-        spawnMachine('hp_raspadora', [wps.eq_hp_raspadora[0], 0, wps.eq_hp_raspadora[2] - 0.65], '#0284c7');
+        spawnMachine('hp_raspadora', [-3.50, 0, -2.95], '#0284c7');
         spawnMachine('hp_crepera', [wps.eq_hp_crepera[0], 0, wps.eq_hp_crepera[2] - 0.65]);
         spawnMachine('hp_marquesitera', [wps.eq_hp_marquesitera[0], 0, wps.eq_hp_marquesitera[2] - 0.65]);
         spawnMachine('hp_licuadora', [wps.eq_hp_licuadora[0], 0, wps.eq_hp_licuadora[2] - 0.65]);
@@ -700,10 +706,15 @@ export default function GameCanvas3D() {
           }
         }
 
+        const iceBlockRatio =
+          eqRuntime.raspadosRestantesHielo !== undefined
+            ? eqRuntime.raspadosRestantesHielo / (eqRuntime.maxRaspadosPorBloque || 10)
+            : 1;
+
         updateApplianceVisualState(
           eqKey,
           meshGroup,
-          { isWorking, isPreheat, isActive, stepCodigo, stepProgress },
+          { isWorking, isPreheat, isActive, stepCodigo, stepProgress, iceBlockRatio },
           nowSec
         );
       });
@@ -987,6 +998,8 @@ export default function GameCanvas3D() {
                 elapsedSec: opSec,
                 costoMxn: opKwh * tarifaEfectivaKwh,
                 estado: curStep.estadoEquipo || 'WORK',
+                iceRemaining: eqKey === 'hp_raspadora' ? (eqMeta?.raspadosRestantesHielo ?? 10) : null,
+                iceMax: eqKey === 'hp_raspadora' ? (eqMeta?.maxRaspadosPorBloque ?? 10) : null,
                 x: screenPos.x,
                 y: screenPos.y
               });
@@ -1023,6 +1036,8 @@ export default function GameCanvas3D() {
               elapsedSec: eq.segundosEnOperacionActual || 0,
               costoMxn: (eq.kwhEnOperacionActual || 0) * tarifaEfectivaKwh,
               estado: eq.estado,
+              iceRemaining: eqKey === 'hp_raspadora' ? (eq.raspadosRestantesHielo ?? 10) : null,
+              iceMax: eqKey === 'hp_raspadora' ? (eq.maxRaspadosPorBloque ?? 10) : null,
               x: screenPos.x,
               y: screenPos.y
             });
@@ -1319,6 +1334,14 @@ export default function GameCanvas3D() {
                   <span className="text-slate-400">💲 Gasto op.:</span>
                   <span className="font-bold text-emerald-300">{formatOpCostMxn(tel.costoMxn)}</span>
                 </div>
+                {tel.iceRemaining !== null && tel.iceRemaining !== undefined && (
+                  <div className="flex items-center justify-between gap-2 pt-0.5 border-t border-white/10">
+                    <span className="text-slate-400">🧊 Bloque:</span>
+                    <span className={`font-bold ${tel.iceRemaining <= 2 ? 'text-rose-300' : 'text-cyan-300'}`}>
+                      {tel.iceRemaining}/{tel.iceMax} raspados
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           );
