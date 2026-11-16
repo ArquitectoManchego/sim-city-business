@@ -994,6 +994,7 @@ export const useGameStore = create((set, get) => ({
     const nextSimTimeMs = state.simTimeMs + simDeltaSec * 1000;
     const simDate = new Date(nextSimTimeMs);
     const simHour = simDate.getHours();
+    const simMinute = simDate.getMinutes();
 
     const condiciones = evaluarCondicionesDemanda(simDate, state.campanasActivas, state.escenarioGlobal);
     const recetasEntrenadas = useTrainingStore.getState().recetasEntrenadas;
@@ -2379,7 +2380,44 @@ export const useGameStore = create((set, get) => ({
         inventarioPorNegocio: nextInventario,
         equiposRuntime: nextEquipos,
         historialDiario: nextHistorial.slice(0, 365),
-        liveLogs: nextLogs.slice(0, 180)
+        liveLogs: nextLogs.slice(0, 180),
+        clientesColaPorNegocio: {
+          hawaiian_paradise: [],
+          imperia_uniformes: [],
+          papeleria_imperiarte: [],
+          bordados_veracruz: [],
+          taller_costura: [],
+          taller_publi_imperia: []
+        },
+        clientesPostCompraPorNegocio: {
+          hawaiian_paradise: [],
+          imperia_uniformes: [],
+          papeleria_imperiarte: [],
+          bordados_veracruz: [],
+          taller_costura: [],
+          taller_publi_imperia: []
+        },
+        empleadosListaPorNegocio: Object.fromEntries(
+          Object.entries(state.empleadosListaPorNegocio || {}).map(([negId, emps]) => [
+            negId,
+            (emps || []).map((e) => ({
+              ...e,
+              estado: 'IDLE_TASK',
+              pedidoActual: null,
+              recetaActual: null,
+              pasoActualIndex: 0,
+              progresoPaso: 0,
+              itemEnMano: null,
+              animacionActual: null,
+              textoAccion: 'Listo para atender'
+            }))
+          ])
+        ),
+        familiaState: {
+          ...state.familiaState,
+          visitActive: false,
+          eatingWithManager: false
+        }
       };
     });
   }

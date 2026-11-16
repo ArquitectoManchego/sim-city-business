@@ -812,9 +812,17 @@ export default function GameCanvas3D() {
       });
 
       if (trainingState.isTrainingMode) {
-        trainingState.tickTrainingDemo(dt);
+        try {
+          trainingState.tickTrainingDemo(dt);
+        } catch (trainErr) {
+          console.error("Error en tickTrainingDemo:", trainErr);
+        }
       } else {
-        gameState.advanceSimulationTick(dt);
+        try {
+          gameState.advanceSimulationTick(dt);
+        } catch (simErr) {
+          console.error("Error en advanceSimulationTick:", simErr);
+        }
       }
 
       const freshGame = useGameStore.getState();
