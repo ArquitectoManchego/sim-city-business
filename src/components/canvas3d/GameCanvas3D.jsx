@@ -1049,7 +1049,7 @@ export default function GameCanvas3D() {
           activeCustomerIds.add(cli.id);
           let cliMesh = actorGroupsRef.current.customers[cli.id];
           if (!cliMesh) {
-            const cliProfile = buildCustomerSims2Profile(cli.id, cli.colorCamisa || '#38bdf8', cli.arquetipoId || cli.tipo);
+            const cliProfile = buildCustomerSims2Profile(cli.id, cli.colorCamisa || '#38bdf8');
             cliMesh = createSims2ActorGroup(cliProfile);
             cliMesh.position.set(cx + cli.posicionLocal[0], 0, cz + cli.posicionLocal[2]);
             scene.add(cliMesh);

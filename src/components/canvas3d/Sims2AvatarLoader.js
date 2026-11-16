@@ -5,22 +5,9 @@ import { GLTFLoader, SkeletonUtils } from 'three-stdlib';
 // CATÁLOGOS THE SIMS 2 CAS (PIEL, COMPLEXIÓN, CABELLO, PRENDAS, 27 SLIDERS)
 // ============================================================================
 export const SIMS2_MODEL_PATHS = {
-  male_casual: '/models/sims2/male_casual.glb',
-  male_base: '/models/avatar_engine/body_male_base.glb',
-  female_casual: '/models/sims2/female_casual.glb',
-  female_base: '/models/avatar_engine/body_female_base.glb',
-  child_base: '/models/avatar_engine/body_child_base.glb',
-  doctor_male: '/models/sims2/doctor_male.glb',
-  doctor_female: '/models/sims2/doctor_female.glb',
-  nurse_male: '/models/sims2/nurse_male.glb',
-  nurse_female: '/models/sims2/nurse_female.glb',
-  top_polo: '/models/avatar_engine/wardrobe/top_polo.glb',
-  top_scrub: '/models/avatar_engine/wardrobe/top_scrub.glb',
-  top_labcoat: '/models/avatar_engine/wardrobe/top_labcoat.glb',
-  bottom_scrub_pants: '/models/avatar_engine/wardrobe/bottom_scrub_pants.glb',
-  bottom_jeans: '/models/avatar_engine/wardrobe/bottom_jeans.glb',
-  bottom_bermuda: '/models/avatar_engine/wardrobe/bottom_bermuda.glb',
-  shoes_sneakers: '/models/avatar_engine/wardrobe/shoes_sneakers.glb'
+  male_base: '/models/sims2/male_base.glb',
+  female_base: '/models/sims2/female_base.glb',
+  female_casual: '/models/sims2/female_casual.glb'
 };
 
 export const SIMS2_SKIN_TONES = [
@@ -275,9 +262,9 @@ export function createDefaultSims2Profiles() {
       roleTag: 'Gerente / Diseñador Principal',
       baseModel: 'male_base',
       gender: 'M',
-      age: 42,
+      age: 38,
       heightCm: 176,
-      weightKg: 77,
+      weightKg: 76,
       shoulderCm: 46,
       bustCm: 100,
       waistCm: 84,
@@ -290,10 +277,8 @@ export function createDefaultSims2Profiles() {
       hairColor: '#1e1b18',
       topStyle: 'polo',
       topColor: '#facc15',
-      topFabric: 'algodon',
       bottomStyle: 'jeans',
       bottomColor: '#1e293b',
-      bottomFabric: 'mezclilla',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: true,
@@ -312,17 +297,17 @@ export function createDefaultSims2Profiles() {
     familia_esposa: {
       ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_esposa',
-      displayName: 'Esposa (42 años)',
-      roleTag: 'Esposa — Familia',
-      baseModel: 'female_base',
+      displayName: 'Esposa (Familia)',
+      roleTag: 'Familia — Visita 3–4 PM',
+      baseModel: 'female_casual',
       gender: 'F',
-      age: 42,
+      age: 35,
       heightCm: 163,
-      weightKg: 60,
+      weightKg: 58,
       shoulderCm: 38,
-      bustCm: 92,
-      waistCm: 72,
-      hipCm: 96,
+      bustCm: 90,
+      waistCm: 68,
+      hipCm: 95,
       complexion: 'media',
       skinTone: 'S2',
       skinColor: '#e2af8c',
@@ -330,17 +315,23 @@ export function createDefaultSims2Profiles() {
       hairStyle: 'largo_liso',
       hairColor: '#3b2314',
       topStyle: 'camisa',
-      topColor: '#f472b6',
-      topFabric: 'lino',
-      bottomStyle: 'pantalon_vestir',
+      topColor: '#ec4899',
+      bottomStyle: 'jeans',
       bottomColor: '#334155',
-      bottomFabric: 'algodon',
       shoeColor: '#1e293b',
       hasGlasses: false,
       hasAura: true,
       auraColor: '#f472b6',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, cheekboneWidth: 0.15, eyeSize: 0.15, mouthCornerCurve: 0.2 },
+      glutesVolume: 0.7,
+      glutesFat: 0.35,
+      glutesMuscle: 0.4,
+      glutesRoundness: 0.9,
+      glutesShape: 'bubblebutt',
+      bustCup: 'D',
+      bustShape: 'semi_esfera',
+      topFabric: 'seda',
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, cheekboneWidth: 0.2, eyeSize: 0.2, mouthCornerCurve: 0.25 },
       accessories: {
         reloj: 'clasico_oro',
         gorra: 'ninguno',
@@ -351,76 +342,64 @@ export function createDefaultSims2Profiles() {
       }
     },
     familia_alex: {
-      ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_alex',
       displayName: 'Alex Jr. (12 años)',
-      roleTag: 'Hijo 12 años — Familia',
-      baseModel: 'child_base',
+      roleTag: 'Hijo 12 años — Visita 3–4 PM',
+      baseModel: 'male_base',
       gender: 'M',
       age: 12,
-      heightCm: 148,
-      weightKg: 41,
-      shoulderCm: 34,
-      bustCm: 72,
-      waistCm: 62,
-      hipCm: 74,
+      heightCm: 150,
+      weightKg: 43,
+      shoulderCm: 36,
+      bustCm: 74,
+      waistCm: 64,
+      hipCm: 78,
       complexion: 'delgada',
       skinTone: 'S2',
       skinColor: '#e0ab88',
       eyeColor: '#3b2416',
       hairStyle: 'corto_ejecutivo',
       hairColor: '#261c15',
-      topStyle: 'polo',
-      topColor: '#0284c7',
-      topFabric: 'algodon',
+      topStyle: 'hoodie',
+      topColor: '#38bdf8',
       bottomStyle: 'jeans',
       bottomColor: '#1e3a8a',
-      bottomFabric: 'mezclilla',
-      shoeColor: '#f8fafc',
+      shoeColor: '#e2e8f0',
       hasGlasses: false,
       hasAura: true,
       auraColor: '#38bdf8',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.25, faceWidth: -0.1, jawWidth: -0.2 }
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.3, faceWidth: -0.1, jawWidth: -0.25 }
     },
     familia_barbara: {
-      ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_barbara',
       displayName: 'Bárbara (8 años)',
-      roleTag: 'Hija 8 años — Familia',
-      baseModel: 'child_base',
+      roleTag: 'Hija 8 años — Visita 3–4 PM',
+      baseModel: 'female_base',
       gender: 'F',
       age: 8,
-      heightCm: 124,
-      weightKg: 25,
-      shoulderCm: 29,
-      bustCm: 58,
+      heightCm: 126,
+      weightKg: 27,
+      shoulderCm: 32,
+      bustCm: 64,
       waistCm: 56,
-      hipCm: 62,
-      bustCup: 'A',
-      bustShape: 'semi_esfera',
-      glutesVolume: 0,
-      glutesFat: 0,
-      glutesMuscle: 0,
-      glutesRoundness: 0,
+      hipCm: 68,
       complexion: 'delgada',
       skinTone: 'S1',
       skinColor: '#f1c6ab',
       eyeColor: '#452b1a',
       hairStyle: 'ondulado_casual',
       hairColor: '#3b2618',
-      topStyle: 'polo',
+      topStyle: 'tshirt',
       topColor: '#a855f7',
-      topFabric: 'algodon',
-      bottomStyle: 'bermuda',
+      bottomStyle: 'falda',
       bottomColor: '#1e1b4b',
-      bottomFabric: 'algodon',
       shoeColor: '#f8fafc',
       hasGlasses: false,
       hasAura: true,
       auraColor: '#c084fc',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.3, cheekboneWidth: 0.2, jawWidth: -0.3 }
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.35, cheekboneWidth: 0.25, jawWidth: -0.35 }
     },
     emp_hawaiian_paradise_0: {
       id: 'emp_hawaiian_paradise_0',
@@ -443,10 +422,8 @@ export function createDefaultSims2Profiles() {
       hairColor: '#1f1612',
       topStyle: 'polo',
       topColor: '#f59e0b',
-      topFabric: 'algodon',
-      bottomStyle: 'bermuda',
+      bottomStyle: 'jeans',
       bottomColor: '#1e293b',
-      bottomFabric: 'algodon',
       shoeColor: '#111827',
       hasGlasses: false,
       hasAura: false,
@@ -457,7 +434,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_imperia_uniformes_0',
       displayName: 'Asesora Mostrador Imperia #1',
       roleTag: 'Imperia Uniformes',
-      baseModel: 'female_base',
+      baseModel: 'female_casual',
       gender: 'F',
       age: 28,
       heightCm: 165,
@@ -472,12 +449,10 @@ export function createDefaultSims2Profiles() {
       eyeColor: '#3b2416',
       hairStyle: 'largo_liso',
       hairColor: '#2d1c12',
-      topStyle: 'polo',
+      topStyle: 'filipina',
       topColor: '#10b981',
-      topFabric: 'algodon',
       bottomStyle: 'pantalon_vestir',
       bottomColor: '#064e3b',
-      bottomFabric: 'gabardina',
       shoeColor: '#0f172a',
       hasGlasses: true,
       hasAura: false,
@@ -505,10 +480,8 @@ export function createDefaultSims2Profiles() {
       hairColor: '#141414',
       topStyle: 'polo',
       topColor: '#3b82f6',
-      topFabric: 'algodon',
-      bottomStyle: 'jeans',
+      bottomStyle: 'pantalon_vestir',
       bottomColor: '#1e293b',
-      bottomFabric: 'mezclilla',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: false,
@@ -536,10 +509,8 @@ export function createDefaultSims2Profiles() {
       hairColor: '#111111',
       topStyle: 'polo',
       topColor: '#f43f5e',
-      topFabric: 'algodon',
       bottomStyle: 'cargo',
       bottomColor: '#334155',
-      bottomFabric: 'gabardina',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: false,
@@ -565,12 +536,10 @@ export function createDefaultSims2Profiles() {
       eyeColor: '#2a1a10',
       hairStyle: 'ondulado_casual',
       hairColor: '#241710',
-      topStyle: 'polo',
+      topStyle: 'filipina',
       topColor: '#a855f7',
-      topFabric: 'algodon',
       bottomStyle: 'pantalon_vestir',
       bottomColor: '#1e1b4b',
-      bottomFabric: 'algodon',
       shoeColor: '#111827',
       hasGlasses: false,
       hasAura: false,
@@ -596,12 +565,10 @@ export function createDefaultSims2Profiles() {
       eyeColor: '#2b1b12',
       hairStyle: 'corto_ejecutivo',
       hairColor: '#1c1512',
-      topStyle: 'polo',
+      topStyle: 'tshirt',
       topColor: '#06b6d4',
-      topFabric: 'algodon',
       bottomStyle: 'cargo',
       bottomColor: '#1e293b',
-      bottomFabric: 'gabardina',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: false,
@@ -622,124 +589,46 @@ export function createDefaultSims2Profiles() {
   return profiles;
 }
 
-export function buildCustomerSims2Profile(customerId, shirtColorHex = '#3b82f6', archetypeId = null) {
+export function buildCustomerSims2Profile(customerId, shirtColorHex = '#3b82f6') {
   let hash = 0;
   for (let i = 0; i < String(customerId).length; i++) {
     hash = (hash * 31 + String(customerId).charCodeAt(i)) >>> 0;
   }
-  const isMale = (hash % 2 === 0);
+  const models = ['male_base', 'female_base', 'female_casual'];
+  const baseModel = models[hash % models.length];
+  const isMale = baseModel === 'male_base';
   const skinObj = SIMS2_SKIN_TONES[hash % SIMS2_SKIN_TONES.length];
   const compObj = SIMS2_COMPLEXIONS[(hash >>> 2) % 3]; // delgada, atletica, media
   const pantPalette = ['#1e293b', '#334155', '#0f172a', '#3f3f46', '#1e3a8a'];
   const hairPalette = ['#111111', '#2c1b12', '#4a3020', '#6b4728', '#8c6239'];
-
-  let baseModel = isMale ? 'male_casual' : 'female_casual';
-  let displayName = 'Cliente';
-  let topStyle = (hash % 2 === 0) ? 'polo' : 'tshirt';
-  let topColor = shirtColorHex;
-  let topFabric = 'algodon';
-  let bottomStyle = 'jeans';
-  let bottomColor = pantPalette[hash % pantPalette.length];
-  let bottomFabric = 'mezclilla';
-  let shoeColor = '#111827';
-  let accessories = { ...DEFAULT_BODY_MEASUREMENTS.accessories };
-
-  if (archetypeId === 'doctor_medico') {
-    baseModel = isMale ? 'doctor_male' : 'doctor_female';
-    displayName = isMale ? 'Dr. Especialista' : 'Dra. Especialista';
-    topStyle = 'filipina';
-    topColor = '#ffffff';
-    topFabric = 'antifluido';
-    bottomStyle = 'pantalon_vestir';
-    bottomColor = '#0284c7';
-    bottomFabric = 'antifluido';
-    shoeColor = '#f8fafc';
-  } else if (archetypeId === 'enfermera_clinica') {
-    baseModel = isMale ? 'nurse_male' : 'nurse_female';
-    displayName = isMale ? 'Enfermero Clínico' : 'Enfermera Clínica';
-    topStyle = 'filipina';
-    topColor = '#14b8a6';
-    topFabric = 'antifluido';
-    bottomStyle = 'pantalon_vestir';
-    bottomColor = '#0f766e';
-    bottomFabric = 'antifluido';
-    shoeColor = '#f8fafc';
-  } else if (archetypeId === 'estudiante_medicina') {
-    baseModel = isMale ? 'doctor_male' : 'doctor_female';
-    displayName = 'Estudiante Medicina UV';
-    topStyle = 'filipina';
-    topColor = '#ffffff';
-    topFabric = 'antifluido';
-    bottomStyle = 'pantalon_vestir';
-    bottomColor = '#ffffff';
-    bottomFabric = 'antifluido';
-    shoeColor = '#ffffff';
-  } else if (archetypeId === 'estudiante_enfermeria') {
-    baseModel = isMale ? 'nurse_male' : 'nurse_female';
-    displayName = 'Estudiante Enfermería UV';
-    topStyle = 'filipina';
-    topColor = '#ffffff';
-    topFabric = 'antifluido';
-    bottomStyle = 'pantalon_vestir';
-    bottomColor = '#ffffff';
-    bottomFabric = 'antifluido';
-    shoeColor = '#ffffff';
-  } else if (archetypeId === 'chef_restaurantero') {
-    baseModel = isMale ? 'male_casual' : 'female_casual';
-    displayName = 'Chef Gastrónomo';
-    topStyle = 'filipina';
-    topColor = '#ffffff';
-    topFabric = 'gabardina';
-    bottomStyle = 'pantalon_vestir';
-    bottomColor = '#1e293b';
-    accessories.gorra = 'cofia_chef';
-  } else if (archetypeId === 'cliente_corporativo') {
-    baseModel = isMale ? 'male_casual' : 'female_casual';
-    displayName = 'Cliente Corporativo';
-    topStyle = 'camisa';
-    topColor = '#f8fafc';
-    bottomStyle = 'pantalon_vestir';
-    bottomColor = '#1e293b';
-  } else if (archetypeId === 'estudiante_univ') {
-    baseModel = isMale ? 'male_casual' : 'female_casual';
-    displayName = 'Estudiante Universitario';
-    topStyle = 'polo';
-    topColor = '#38bdf8';
-    bottomStyle = 'jeans';
-    bottomColor = '#1e3a8a';
-  }
-
   return {
     ...DEFAULT_BODY_MEASUREMENTS,
     id: `cust_${customerId}`,
-    displayName,
+    displayName: 'Cliente',
     baseModel,
     gender: isMale ? 'M' : 'F',
-    age: 20 + (hash % 35),
-    heightCm: isMale ? 172 + (hash % 10) : 160 + (hash % 8),
-    weightKg: isMale ? 70 + (hash % 14) : 56 + (hash % 10),
-    shoulderCm: isMale ? 44 : 38,
-    bustCm: isMale ? 98 : 88,
-    waistCm: isMale ? 82 : 70,
-    hipCm: isMale ? 96 : 95,
+    age: 20 + (hash % 32),
+    heightCm: isMale ? 168 + (hash % 14) : 156 + (hash % 12),
+    weightKg: isMale ? 66 + (hash % 18) : 53 + (hash % 14),
+    shoulderCm: isMale ? 43 : 37,
+    bustCm: isMale ? 96 : 88,
+    waistCm: isMale ? 80 : 68,
+    hipCm: isMale ? 95 : 94,
     complexion: compObj.id,
     skinTone: skinObj.id,
     skinColor: skinObj.hex,
     eyeColor: '#2c1e16',
     hairStyle: 'nativo',
     hairColor: hairPalette[hash % hairPalette.length],
-    topStyle,
-    topColor,
-    topFabric,
-    bottomStyle,
-    bottomColor,
-    bottomFabric,
-    shoeColor,
-    hasGlasses: hash % 5 === 0,
+    topStyle: (hash % 3 === 0) ? 'camisa' : 'tshirt',
+    topColor: shirtColorHex,
+    bottomStyle: 'jeans',
+    bottomColor: pantPalette[hash % pantPalette.length],
+    shoeColor: '#111827',
+    hasGlasses: baseModel === 'female_casual' && hash % 4 === 0,
     hasAura: false,
     showPlumbob: false,
-    faceSliders: { ...DEFAULT_FACE_SLIDERS },
-    accessories
+    faceSliders: { ...DEFAULT_FACE_SLIDERS }
   };
 }
 
@@ -1323,7 +1212,7 @@ export function preloadSims2Assets() {
       let hairMesh = null;
 
       scene.traverse((obj) => {
-        if (obj.isBone && (obj.name === 'Head' || obj.name === 'head')) headBone = obj;
+        if (obj.isBone && obj.name === 'Head') headBone = obj;
         if (obj.isSkinnedMesh) {
           obj.castShadow = true;
           obj.receiveShadow = true;
@@ -1345,9 +1234,9 @@ export function preloadSims2Assets() {
         clonedGeom.applyMatrix4(hairToHeadLocal);
         clonedGeom.morphAttributes = {};
         const presetId =
-          key.includes('male')
+          key === 'male_base'
             ? 'corto_ejecutivo'
-            : key.includes('female_base')
+            : key === 'female_base'
               ? 'ondulado_casual'
               : 'largo_liso';
         assetCache.hairPresets[presetId] = {
@@ -1475,113 +1364,6 @@ export function syncSims2Garments3D(actorGroup, profile) {
     const oldRightP = bones.RightUpLeg.getObjectByName('sims2_leg_pocket_right');
     if (oldRightP) bones.RightUpLeg.remove(oldRightP);
   }
-
-  const isModularBase = ['male_base', 'female_base', 'child_base'].includes(profile.baseModel);
-  if (isModularBase) {
-    const rigRoot = actorGroup.userData.rigRoot;
-    if (!rigRoot) return;
-
-    let bodySkeleton = null;
-    rigRoot.traverse((m) => {
-      if (m.isSkinnedMesh && !m.userData.isGarment) {
-        bodySkeleton = m.skeleton;
-      }
-    });
-
-    if (!bodySkeleton) return;
-
-    // 1. Prenda Superior (Top)
-    const topKey = profile.topStyle === 'filipina' ? 'top_scrub' :
-                   (profile.topStyle === 'bata' || (profile.roleTag && profile.roleTag.includes('Doctor'))) ? 'top_labcoat' :
-                   'top_polo';
-
-    let currentTop = rigRoot.getObjectByName('modular_top_garment');
-    if (currentTop && currentTop.userData.garmentKey !== topKey) {
-      rigRoot.remove(currentTop);
-      currentTop = null;
-    }
-
-    if (!currentTop && assetCache.models[topKey]) {
-      const topEntry = assetCache.models[topKey];
-      topEntry.scene.traverse((child) => {
-        if (child.isSkinnedMesh && !currentTop) {
-          currentTop = child.clone();
-          currentTop.name = 'modular_top_garment';
-          currentTop.userData.isGarment = true;
-          currentTop.userData.garmentKey = topKey;
-          currentTop.material = child.material.clone();
-          currentTop.bind(bodySkeleton, currentTop.bindMatrix);
-          rigRoot.add(currentTop);
-        }
-      });
-    }
-
-    if (currentTop && currentTop.material) {
-      currentTop.material.color.set(profile.topColor || (topKey === 'top_scrub' ? '#0d9488' : '#1e3a8a'));
-      currentTop.material.roughness = profile.topFabric === 'seda' ? 0.35 : 0.8;
-      currentTop.material.needsUpdate = true;
-    }
-
-    // 2. Prenda Inferior (Bottom)
-    const bottomKey = profile.bottomStyle === 'bermuda' ? 'bottom_bermuda' :
-                      (profile.bottomStyle === 'pantalon_vestir' || (profile.roleTag && profile.roleTag.includes('Doctor'))) ? 'bottom_scrub_pants' :
-                      'bottom_jeans';
-
-    let currentBottom = rigRoot.getObjectByName('modular_bottom_garment');
-    if (currentBottom && currentBottom.userData.garmentKey !== bottomKey) {
-      rigRoot.remove(currentBottom);
-      currentBottom = null;
-    }
-
-    if (!currentBottom && assetCache.models[bottomKey]) {
-      const bEntry = assetCache.models[bottomKey];
-      bEntry.scene.traverse((child) => {
-        if (child.isSkinnedMesh && !currentBottom) {
-          currentBottom = child.clone();
-          currentBottom.name = 'modular_bottom_garment';
-          currentBottom.userData.isGarment = true;
-          currentBottom.userData.garmentKey = bottomKey;
-          currentBottom.material = child.material.clone();
-          currentBottom.bind(bodySkeleton, currentBottom.bindMatrix);
-          rigRoot.add(currentBottom);
-        }
-      });
-    }
-
-    if (currentBottom && currentBottom.material) {
-      currentBottom.material.color.set(profile.bottomColor || (bottomKey === 'bottom_scrub_pants' ? '#0d9488' : '#1e293b'));
-      currentBottom.material.roughness = profile.bottomFabric === 'seda' ? 0.35 : 0.8;
-      currentBottom.material.needsUpdate = true;
-    }
-
-    // 3. Calzado (Shoes)
-    const shoeKey = 'shoes_sneakers';
-    let currentShoes = rigRoot.getObjectByName('modular_shoes_garment');
-    if (!currentShoes && assetCache.models[shoeKey]) {
-      const sEntry = assetCache.models[shoeKey];
-      sEntry.scene.traverse((child) => {
-        if (child.isSkinnedMesh && !currentShoes) {
-          currentShoes = child.clone();
-          currentShoes.name = 'modular_shoes_garment';
-          currentShoes.userData.isGarment = true;
-          currentShoes.userData.garmentKey = shoeKey;
-          currentShoes.material = child.material.clone();
-          currentShoes.bind(bodySkeleton, currentShoes.bindMatrix);
-          rigRoot.add(currentShoes);
-        }
-      });
-    }
-
-    if (currentShoes && currentShoes.material) {
-      currentShoes.material.color.set(profile.shoeColor || '#f8fafc');
-      currentShoes.material.needsUpdate = true;
-    }
-
-    return;
-  }
-
-  const isMedicalBase = ['doctor_male', 'doctor_female', 'nurse_male', 'nurse_female'].includes(profile.baseModel);
-  if (isMedicalBase) return;
 
   const topCol = new THREE.Color(profile.topColor || '#3b82f6');
   const bottomCol = new THREE.Color(profile.bottomColor || '#1e293b');
@@ -2090,82 +1872,8 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
     mouthLowerDownRight: Math.max(0, fs.lowerLipThickness * 0.5),
     jawForward: THREE.MathUtils.clamp(fs.chinLength * 0.35, 0, 0.7),
     cheekSquintLeft: Math.max(0, fs.cheekboneWidth * 0.45),
-    cheekSquintRight: Math.max(0, fs.cheekboneWidth * 0.45),
-
-    // Shape Keys Nativas MakeHuman MPFB2 (Cuerpo base y Ropa modular):
-    bust_volume_up: (profile.gender === 'F' && (!profile.age || profile.age > 12)) ? Math.max(0, cupFactor - 0.35) * BODY_MOD_FACTOR : 0,
-    bust_volume_down: (profile.gender === 'F' && (!profile.age || profile.age > 12)) ? Math.max(0, -(cupFactor - 0.35)) * BODY_MOD_FACTOR : 0,
-    bust_firmness_up: (profile.gender === 'F' && (!profile.age || profile.age > 12) && (bustShape === 'esfera' || bustShape === 'pico')) ? 0.8 * BODY_MOD_FACTOR : 0,
-    bust_firmness_down: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'pera') ? 0.8 * BODY_MOD_FACTOR : 0,
-    bust_distance_up: 0,
-    bust_distance_down: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'esfera') ? 0.5 * BODY_MOD_FACTOR : 0,
-    bust_height_up: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'esfera') ? 0.4 * BODY_MOD_FACTOR : 0,
-    bust_height_down: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'pera') ? 0.4 * BODY_MOD_FACTOR : 0,
-
-    waist_cinch: Math.max(0, -morphWaist) * BODY_MOD_FACTOR,
-    waist_expand: Math.max(0, morphWaist) * BODY_MOD_FACTOR,
-    hip_width_up: Math.max(0, morphHips) * BODY_MOD_FACTOR,
-    hip_width_down: Math.max(0, -morphHips) * BODY_MOD_FACTOR,
-    hip_depth_up: Math.max(0, morphHips * 0.7) * BODY_MOD_FACTOR,
-    glute_volume_up: (gluteShape === 'bubblebutt' ? 1.0 : gluteShape === 'corazon' ? 0.75 : Math.max(0.2, morphHips)) * BODY_MOD_FACTOR,
-    glute_volume_down: (morphHips < -0.2 ? Math.min(1.0, -morphHips) : 0) * BODY_MOD_FACTOR,
-
-    stomach_tone: rawFit * BODY_MOD_FACTOR,
-    stomach_fullness: rawFat * BODY_MOD_FACTOR,
-
-    chest_pectoral: (profile.gender === 'M' && (!profile.age || profile.age > 12)) ? rawFit * BODY_MOD_FACTOR : 0,
-    v_taper: (profile.gender === 'M' && (!profile.age || profile.age > 12)) ? (rawFit * 0.85) * BODY_MOD_FACTOR : 0,
-    back_dorsi: (profile.gender === 'M' && (!profile.age || profile.age > 12)) ? (rawFit * 0.70) * BODY_MOD_FACTOR : 0,
-
-    upperarm_muscle: THREE.MathUtils.clamp(profile.biceps ?? (rawFit * 0.5), 0, 1.3) * BODY_MOD_FACTOR,
-    lowerarm_muscle: THREE.MathUtils.clamp(profile.forearms ?? (rawFit * 0.4), 0, 1.3) * BODY_MOD_FACTOR,
-    upperleg_muscle: THREE.MathUtils.clamp(profile.quads ?? (rawFit * 0.5), 0, 1.4) * BODY_MOD_FACTOR,
-    lowerleg_muscle: THREE.MathUtils.clamp(profile.calves ?? (rawFit * 0.4), 0, 1.3) * BODY_MOD_FACTOR,
-
-    nose_concave: Math.max(0, -(fs.noseBridgeCurve || 0)),
-    nose_convex: Math.max(0, (fs.noseBridgeCurve || 0)),
-    nose_flaring: Math.max(0, (fs.nostrilFlare || 0)),
-    mouth_cupid: Math.max(0, (fs.upperLipThickness || 0)),
-    lips_full: Math.max(0, (fs.lowerLipThickness || 0)),
-    cheek_volume: Math.max(0, (fs.cheekboneWidth || 0)),
-    chin_prominent: Math.max(0, (fs.chinLength || 0)),
-    chin_width: Math.max(0, (fs.jawWidth || 0))
+    cheekSquintRight: Math.max(0, fs.cheekboneWidth * 0.45)
   };
-
-  if (profile.age && profile.age < 14) {
-    morphValues.sims2_bust = 0;
-    morphValues.sims2_bust_cup = 0;
-    morphValues.sims2_bust_pera = 0;
-    morphValues.sims2_bust_pico = 0;
-    morphValues.sims2_bust_esfera = 0;
-    morphValues.sims2_bust_semi_esfera = 0;
-    morphValues.bust_volume_up = 0;
-    morphValues.bust_volume_down = 0;
-    morphValues.bust_firmness_up = 0;
-    morphValues.bust_firmness_down = 0;
-    morphValues.bust_distance_up = 0;
-    morphValues.bust_distance_down = 0;
-    morphValues.bust_height_up = 0;
-    morphValues.bust_height_down = 0;
-    morphValues.sims2_glutes_volume = 0;
-    morphValues.sims2_glutes_bubblebutt = 0;
-    morphValues.sims2_glutes_corazon = 0;
-    morphValues.sims2_glutes_gota = 0;
-    morphValues.sims2_glutes_fat = 0;
-    morphValues.sims2_glutes_muscle = 0;
-    morphValues.glute_volume_up = 0;
-    morphValues.glute_volume_down = 0;
-    morphValues.sims2_waist = 0;
-    morphValues.sims2_hips = 0;
-    morphValues.waist_cinch = 0;
-    morphValues.waist_expand = 0;
-    morphValues.hip_width_up = 0;
-    morphValues.hip_width_down = 0;
-    morphValues.hip_depth_up = 0;
-    morphValues.chest_pectoral = 0;
-    morphValues.v_taper = 0;
-    morphValues.back_dorsi = 0;
-  }
 
   rigRoot.traverse((obj) => {
     if (!obj.isMesh) return;
@@ -2231,8 +1939,6 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
   // 4. Swapping de pelucas personalizadas en el hueso Head
   const headBone = actorGroup.userData.bones?.Head;
   if (headBone) {
-    const childHeadScale = profile.age && profile.age <= 8 ? 1.20 : profile.age && profile.age <= 12 ? 1.08 : 1.0;
-    headBone.scale.set(childHeadScale, childHeadScale, childHeadScale);
     let customHairMesh = headBone.getObjectByName('sims2_custom_hair_attachment');
     if (profile.hairStyle && profile.hairStyle !== 'nativo' && profile.hairStyle !== 'calvo') {
       const preset = assetCache.hairPresets[profile.hairStyle];
@@ -2311,23 +2017,6 @@ function hydrateActorWithGLB(actorGroup, profile) {
       }
     }
   });
-
-  // Aliases para esqueletos MakeHuman / GameEngine (53 huesos) hacia convención Sims 2
-  if (bones.pelvis && !bones.Hips) bones.Hips = bones.pelvis;
-  if (bones.spine_01 && !bones.Spine) bones.Spine = bones.spine_01;
-  if (bones.spine_03 && !bones.Spine2) bones.Spine2 = bones.spine_03;
-  else if (bones.spine_02 && !bones.Spine2) bones.Spine2 = bones.spine_02;
-  if (bones.head && !bones.Head) bones.Head = bones.head;
-  if (bones.upperarm_l && !bones.LeftArm) bones.LeftArm = bones.upperarm_l;
-  if (bones.lowerarm_l && !bones.LeftForeArm) bones.LeftForeArm = bones.lowerarm_l;
-  if (bones.hand_l && !bones.LeftHand) bones.LeftHand = bones.hand_l;
-  if (bones.upperarm_r && !bones.RightArm) bones.RightArm = bones.upperarm_r;
-  if (bones.lowerarm_r && !bones.RightForeArm) bones.RightForeArm = bones.lowerarm_r;
-  if (bones.hand_r && !bones.RightHand) bones.RightHand = bones.hand_r;
-  if (bones.thigh_l && !bones.LeftUpLeg) bones.LeftUpLeg = bones.thigh_l;
-  if (bones.calf_l && !bones.LeftLeg) bones.LeftLeg = bones.calf_l;
-  if (bones.thigh_r && !bones.RightUpLeg) bones.RightUpLeg = bones.thigh_r;
-  if (bones.calf_r && !bones.RightLeg) bones.RightLeg = bones.calf_r;
 
   // Anclas para accesorios sostenidos en ambas manos (tazas, crepas, pala/rastrillo, vasos, telas)
   let rightHandSocket = null;
