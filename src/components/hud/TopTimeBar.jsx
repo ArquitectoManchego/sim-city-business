@@ -22,7 +22,9 @@ import {
   Building2,
   ChevronDown,
   Sparkles,
-  Bluetooth
+  Bluetooth,
+  Layers,
+  Eye
 } from 'lucide-react';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { useTrainingStore } from '../../store/useTrainingStore.js';
@@ -56,6 +58,7 @@ export default function TopTimeBar({ onOpenAudioModal }) {
   const isCollisionToolOpen = useSceneEditorStore((s) => s.isCollisionToolOpen);
 
   const [isVistaArcOpen, setIsVistaArcOpen] = useState(false);
+  const [lastSingleNegocio, setLastSingleNegocio] = useState('hawaiian_paradise');
 
   const simDate = new Date(simTimeMs);
   const cond = evaluarCondicionesDemanda(simDate, campanasActivas, escenarioGlobal);
@@ -233,8 +236,8 @@ export default function TopTimeBar({ onOpenAudioModal }) {
           </button>
         </div>
 
-        {/* Centro: Botón "Vista General" con los 6 negocios desplegándose en arco / semicírculo */}
-        <div className="relative z-50 flex items-center justify-center">
+        {/* Centro: Botón "Vista General" con los 6 negocios desplegándose en arco / semicírculo + Botón Ver Todos */}
+        <div className="relative z-50 flex items-center justify-center gap-2">
           {isVistaArcOpen && (
             <div
               onClick={() => setIsVistaArcOpen(false)}
@@ -266,6 +269,44 @@ export default function TopTimeBar({ onOpenAudioModal }) {
                 isVistaArcOpen ? 'rotate-180' : ''
               }`}
             />
+          </button>
+
+          {/* Botón directo: Ver Todos los Locales vs Ver Solo este Local */}
+          <button
+            data-testid="toggle-view-all-btn"
+            onClick={() => {
+              setIsVistaArcOpen(false);
+              if (focusedNegocioId === 'ALL_CONSORCIO') {
+                setFocusedNegocioId(lastSingleNegocio || 'hawaiian_paradise');
+              } else {
+                if (ALL_ZONES_3D[focusedNegocioId]) {
+                  setLastSingleNegocio(focusedNegocioId);
+                }
+                setFocusedNegocioId('ALL_CONSORCIO');
+              }
+            }}
+            className={`relative z-50 flex items-center gap-1.5 px-3 py-1 rounded-lg text-[11px] font-bold transition border shadow ${
+              focusedNegocioId === 'ALL_CONSORCIO'
+                ? 'bg-amber-500 text-slate-950 border-amber-300 shadow-amber-500/20 hover:bg-amber-400'
+                : 'bg-slate-900 text-teal-300 border-teal-500/50 hover:bg-slate-800'
+            }`}
+            title={
+              focusedNegocioId === 'ALL_CONSORCIO'
+                ? 'Volver a ver solo un local a la vez'
+                : 'Ver todos los locales al mismo tiempo en la plaza'
+            }
+          >
+            {focusedNegocioId === 'ALL_CONSORCIO' ? (
+              <>
+                <Eye className="w-3.5 h-3.5" />
+                <span>🎯 Ver Solo 1 Local</span>
+              </>
+            ) : (
+              <>
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>🏢 Ver Todos los Locales</span>
+              </>
+            )}
           </button>
 
           {/* Arco / Semicírculo Flotante de los 6 Negocios + Consorcio General */}

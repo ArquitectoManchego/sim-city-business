@@ -577,48 +577,65 @@ export const useGameStore = create((set, get) => ({
       };
     }),
 
-  triggerFamiliaVisit: (eatAtHawaiian = false) =>
+  triggerFamiliaVisit: (goEatHawaiian = true) =>
     set((state) => {
-      const targetZone = eatAtHawaiian ? 'hawaiian_paradise' : 'oficinas_consorcio';
+      const targetZone = goEatHawaiian ? 'hawaiian_paradise' : 'oficinas_consorcio';
       const center = ALL_ZONES_3D[targetZone].center;
-      const wpList = eatAtHawaiian
+      const wpList = goEatHawaiian
         ? ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2']
         : ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
-      const anim = eatAtHawaiian ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA';
-      const txt = eatAtHawaiian ? '🍧 Comiendo en Hawaiian Paradise con papá' : '📺 Viendo Smart TV con Clima A/C en Oficina';
       const simDate = new Date(state.simTimeMs);
       const nextMiembros = state.familiaState.miembros.map((m, i) => ({
         ...m,
         currentZoneId: targetZone,
         targetWaypoint: wpList[i] || 'espera_1',
-        posicionLocal: [0, 0, 4.4],
-        worldPos: [center[0], 0, center[2] + 4.4],
-        animacionActual: anim,
-        textoAccion: txt
+        posicionLocal: goEatHawaiian ? [0, 0, 4.4] : [0, 0, 3.2],
+        worldPos: [center[0], 0, center[2] + (goEatHawaiian ? 4.4 : 3.2)],
+        animacionActual: goEatHawaiian ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA',
+        textoAccion: goEatHawaiian ? '🍧 Comiendo en Hawaiian Paradise con papá' : '📺 Viendo tele en el clima de la Oficina'
       }));
+      const startMs = goEatHawaiian ? state.simTimeMs : state.simTimeMs - 31 * 60 * 1000;
       return {
         focusedNegocioId: targetZone,
         familiaState: {
           ...state.familiaState,
           visitActive: true,
           lastVisitDay: simDate.getDate(),
+          visitStartSimMs: startMs,
           locationZone: targetZone,
-          activityMode: eatAtHawaiian ? 'COMER_HAWAIIAN' : 'OFICINA_TV',
-          eatingWithManager: eatAtHawaiian,
-          visitEndSimMs: state.simTimeMs + 90 * 60 * 1000,
+          activityMode: goEatHawaiian ? 'COMER_HAWAIIAN' : 'OFICINA_TV',
+          eatingWithManager: goEatHawaiian,
+          visitEndSimMs: state.simTimeMs + (goEatHawaiian ? 90 : 59) * 60 * 1000,
           miembros: nextMiembros
         },
-        gerenteState: eatAtHawaiian
-          ? {
-              ...state.gerenteState,
-              targetZoneId: 'hawaiian_paradise',
-              targetWaypoint: 'mesa_1_silla_2',
-              taskType: 'EAT_WITH_FAMILY',
-              isOutsideSupplyRun: false,
-              textoAccion: '👨‍👩‍👧‍👦 Gerente dejó trabajo para sentarse a comer con Esposa, Alex y Bárbara en Hawaiian Paradise',
-              manualLockUntilSimMs: state.simTimeMs + 45 * 60 * 1000
-            }
-          : state.gerenteState,
+        gerenteState: {
+          ...state.gerenteState,
+          currentZoneId: targetZone,
+          targetZoneId: targetZone,
+          targetWaypoint: goEatHawaiian ? 'mesa_1_silla_2' : 'sofa_tv_1',
+          taskType: goEatHawaiian ? 'EAT_WITH_FAMILY' : 'WATCH_TV_SOFA',
+          animacionActual: goEatHawaiian ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA',
+          isOutsideSupplyRun: false,
+          textoAccion: goEatHawaiian
+            ? '👨‍👩‍👧‍👦 Comiendo en Hawaiian Paradise con Esposa, Alex y Bárbara'
+            : '📺 Viendo tele con mi familia en el clima de la Oficina',
+          manualLockUntilSimMs: state.simTimeMs + (goEatHawaiian ? 90 : 59) * 60 * 1000
+        },
+        equiposRuntime: {
+          ...state.equiposRuntime,
+          oc_ac_1tr: {
+            ...state.equiposRuntime.oc_ac_1tr,
+            estado: goEatHawaiian ? 'OFF' : 'WORK',
+            wattsActuales: goEatHawaiian ? 0 : 1150,
+            operacionActiva: !goEatHawaiian
+          },
+          oc_tv_32: {
+            ...state.equiposRuntime.oc_tv_32,
+            estado: goEatHawaiian ? 'OFF' : 'WORK',
+            wattsActuales: goEatHawaiian ? 0 : 55,
+            operacionActiva: !goEatHawaiian
+          }
+        },
         liveLogs: [
           {
             id: `log_fam_${Date.now()}`,
@@ -626,9 +643,9 @@ export const useGameStore = create((set, get) => ({
             horaStr: formatTimeHHMMSS(simDate),
             negocioId: targetZone,
             tipo: 'client',
-            mensaje: eatAtHawaiian
-              ? '👨‍👩‍👧‍👦 Esposa trajo a Alex (12) y Bárbara (8) a comer a Hawaiian Paradise -> El Gerente dejó su tarea y se sienta en su mesa!'
-              : '👨‍👩‍👧‍👦 Llegó Esposa con Alex (12) y Bárbara (8) a Oficina Consorcio (Smart TV + Clima A/C encendidos).'
+            mensaje: goEatHawaiian
+              ? '👨‍👩‍👧‍👦 15:15 hrs — Llegó Esposa con Alex (12) y Bárbara (8) a comer a Hawaiian Paradise (30 min) y luego a la Oficina (1 hr).'
+              : '👨‍👩‍👧‍👦 Familia y Gerente en Oficina Consorcio (Clima A/C + Smart TV encendidos).'
           },
           ...state.liveLogs.slice(0, 140)
         ]
@@ -1623,17 +1640,23 @@ export const useGameStore = create((set, get) => ({
       nextColas[negId] = cola;
     });
 
-    // 5. VISITA FAMILIAR AUTOMÁTICA ENTRE 3:00 PM Y 4:00 PM (Esposa, Alex 12 años y Bárbara 8 años)
-    if (simHour === 15 && nextFamilia.lastVisitDay !== simDate.getDate() && !nextFamilia.visitActive) {
-      const goEatHawaiian = simDate.getDate() % 2 === 0;
-      const targetZ = goEatHawaiian ? 'hawaiian_paradise' : 'oficinas_consorcio';
+    // 5. VISITA FAMILIAR AUTOMÁTICA A LAS 15:15 HRS (Esposa, Alex 12 años y Bárbara 8 años)
+    // Llegan 15:15 hrs a comer media hora (15:15–15:45) y después pasan 1 hr en la oficina viendo tele (15:45–16:45)
+    if (
+      simHour === 15 &&
+      simMinute >= 15 &&
+      nextFamilia.lastVisitDay !== simDate.getDate() &&
+      !nextFamilia.visitActive
+    ) {
+      const targetZ = 'hawaiian_paradise';
       const cZ = ALL_ZONES_3D[targetZ].center;
-      const wps = goEatHawaiian ? ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2'] : ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
+      const wps = ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2'];
       nextFamilia.visitActive = true;
       nextFamilia.lastVisitDay = simDate.getDate();
+      nextFamilia.visitStartSimMs = nextSimTimeMs;
       nextFamilia.locationZone = targetZ;
-      nextFamilia.activityMode = goEatHawaiian ? 'COMER_HAWAIIAN' : 'OFICINA_TV';
-      nextFamilia.eatingWithManager = goEatHawaiian;
+      nextFamilia.activityMode = 'COMER_HAWAIIAN';
+      nextFamilia.eatingWithManager = true;
       nextFamilia.visitEndSimMs = nextSimTimeMs + 90 * 60 * 1000;
       nextFamilia.miembros = nextFamilia.miembros.map((m, i) => ({
         ...m,
@@ -1641,54 +1664,130 @@ export const useGameStore = create((set, get) => ({
         targetWaypoint: wps[i] || 'espera_1',
         posicionLocal: [0, 0, 4.3],
         worldPos: [cZ[0], 0, cZ[2] + 4.3],
-        animacionActual: goEatHawaiian ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA',
-        textoAccion: goEatHawaiian ? '🍧 Comiendo en Hawaiian Paradise' : '📺 Viendo tele en el clima de la Oficina'
+        animacionActual: 'EAT_AT_TABLE',
+        textoAccion: '🍧 Comiendo en Hawaiian Paradise con papá'
       }));
       pushLog(
         targetZ,
         'client',
-        goEatHawaiian
-          ? '👨‍👩‍👧‍👦 3:00 PM — Llegó Esposa con Alex (12) y Bárbara (8) a comer en Hawaiian Paradise!'
-          : '👨‍👩‍👧‍👦 3:00 PM — Esposa trajo a Alex (12) y Bárbara (8) a Oficina Consorcio (TV + Clima A/C).'
+        '👨‍👩‍👧‍👦 15:15 hrs — Llegó Esposa con Alex (12) y Bárbara (8) a comer a Hawaiian Paradise (media hora).'
       );
     }
 
     if (nextFamilia.visitActive) {
-      if (nextSimTimeMs >= (nextFamilia.visitEndSimMs || 0)) {
+      const startMs = nextFamilia.visitStartSimMs || nextSimTimeMs;
+      const elapsedMin = Math.max(0, (nextSimTimeMs - startMs) / (60 * 1000));
+
+      if (elapsedMin >= 90) {
+        // Fase 3: A las 16:45 hrs (90 min después de llegar) se van
         nextFamilia.visitActive = false;
         nextFamilia.eatingWithManager = false;
-      } else {
-        const zIdFam = nextFamilia.locationZone || 'oficinas_consorcio';
-        const famWps =
-          zIdFam === 'hawaiian_paradise'
-            ? ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2']
-            : ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
+        if (nextEquipos.oc_tv_32) {
+          nextEquipos.oc_tv_32 = { ...nextEquipos.oc_tv_32, estado: 'OFF', wattsActuales: 0, operacionActiva: false };
+        }
+        pushLog(
+          'oficinas_consorcio',
+          'client',
+          '👨‍👩‍👧‍👦 16:45 hrs — Esposa, Alex y Bárbara se despiden y se van a casa. El Gerente retoma supervisión de negocios.'
+        );
+      } else if (elapsedMin >= 30) {
+        // Fase 2: 1 hora en la oficina viendo tele (15:45 a 16:45 hrs)
+        const isTransitioningToOffice = nextFamilia.locationZone !== 'oficinas_consorcio';
+        nextFamilia.locationZone = 'oficinas_consorcio';
+        nextFamilia.activityMode = 'OFICINA_TV';
+
+        if (isTransitioningToOffice) {
+          const ofCenter = ALL_ZONES_3D.oficinas_consorcio.center;
+          const ofWps = ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
+          nextFamilia.miembros.forEach((m, i) => {
+            m.currentZoneId = 'oficinas_consorcio';
+            m.targetWaypoint = ofWps[i] || 'sofa_tv_1';
+            m.posicionLocal = [0, 0, 3.2];
+            m.worldPos = [ofCenter[0], 0, ofCenter[2] + 3.2];
+            m.textoAccion = '📺 Viendo tele en el clima de la Oficina';
+            m.animacionActual = 'WATCH_TV_SOFA';
+          });
+          pushLog(
+            'oficinas_consorcio',
+            'client',
+            '👨‍👩‍👧‍👦 15:45 hrs — Familia y Gerente pasan a estar 1 hr en Oficina Consorcio (Clima A/C + Smart TV encendidos).'
+          );
+        }
+
+        const ofWps = ['sofa_tv_1', 'sofa_tv_2', 'sofa_tv_3'];
         nextFamilia.miembros.forEach((m, i) => {
-          const wp = m.targetWaypoint || famWps[i];
-          const arrivedF = moveWorldAgentTowardsTarget(m, zIdFam, wp);
+          m.currentZoneId = 'oficinas_consorcio';
+          const arrivedF = moveWorldAgentTowardsTarget(m, 'oficinas_consorcio', ofWps[i]);
           if (arrivedF) {
-            m.animacionActual = zIdFam === 'hawaiian_paradise' ? 'EAT_AT_TABLE' : 'WATCH_TV_SOFA';
+            m.animacionActual = 'WATCH_TV_SOFA';
           }
         });
-        if (zIdFam === 'oficinas_consorcio') {
-          if (nextEquipos.oc_ac_1tr) nextEquipos.oc_ac_1tr = { ...nextEquipos.oc_ac_1tr, estado: 'WORK', wattsActuales: 1150 };
-          if (nextEquipos.oc_tv_32) nextEquipos.oc_tv_32 = { ...nextEquipos.oc_tv_32, estado: 'WORK', wattsActuales: 55 };
+
+        if (nextEquipos.oc_ac_1tr) {
+          nextEquipos.oc_ac_1tr = { ...nextEquipos.oc_ac_1tr, estado: 'WORK', wattsActuales: 1150, operacionActiva: true };
         }
+        if (nextEquipos.oc_tv_32) {
+          nextEquipos.oc_tv_32 = { ...nextEquipos.oc_tv_32, estado: 'WORK', wattsActuales: 55, operacionActiva: true };
+        }
+      } else {
+        // Fase 1: Comiendo en Hawaiian Paradise durante media hora (15:15 a 15:45 hrs)
+        nextFamilia.locationZone = 'hawaiian_paradise';
+        nextFamilia.activityMode = 'COMER_HAWAIIAN';
+        const hpWps = ['mesa_1_silla_1', 'mesa_2_silla_1', 'mesa_2_silla_2'];
+        nextFamilia.miembros.forEach((m, i) => {
+          m.currentZoneId = 'hawaiian_paradise';
+          const arrivedF = moveWorldAgentTowardsTarget(m, 'hawaiian_paradise', hpWps[i]);
+          if (arrivedF) {
+            m.animacionActual = 'EAT_AT_TABLE';
+          }
+        });
       }
     }
 
     // 6. MOVIMIENTO Y LABORES DEL GERENTE (Usuario con glow + Plumbob en el mundo 3D)
-    if (nextFamilia.visitActive && nextFamilia.locationZone === 'hawaiian_paradise') {
-      // Si su familia bajó a comer a Hawaiian Paradise -> deja su trabajo y va a sentarse con ellos
-      nextGerente.targetZoneId = 'hawaiian_paradise';
-      nextGerente.targetWaypoint = 'mesa_1_silla_2';
-      nextGerente.isOutsideSupplyRun = false;
-      nextGerente.textoAccion = '👨‍👩‍👧‍👦 Comiendo con Esposa, Alex y Bárbara en Hawaiian Paradise';
-      const satWithFam = moveWorldAgentTowardsTarget(nextGerente, 'hawaiian_paradise', 'mesa_1_silla_2');
-      nextGerente.animacionActual = satWithFam ? 'EAT_AT_TABLE' : null;
+    if (nextFamilia.visitActive) {
+      const startMs = nextFamilia.visitStartSimMs || nextSimTimeMs;
+      const elapsedMin = Math.max(0, (nextSimTimeMs - startMs) / (60 * 1000));
+
+      if (elapsedMin < 30) {
+        // Si la familia está comiendo en Hawaiian -> deja su trabajo y come con ellos
+        nextGerente.currentZoneId = 'hawaiian_paradise';
+        nextGerente.targetZoneId = 'hawaiian_paradise';
+        nextGerente.targetWaypoint = 'mesa_1_silla_2';
+        nextGerente.isOutsideSupplyRun = false;
+        nextGerente.textoAccion = '👨‍👩‍👧‍👦 Comiendo en Hawaiian Paradise con Esposa, Alex y Bárbara';
+        const satWithFam = moveWorldAgentTowardsTarget(nextGerente, 'hawaiian_paradise', 'mesa_1_silla_2');
+        nextGerente.animacionActual = satWithFam ? 'EAT_AT_TABLE' : null;
+      } else {
+        // En la oficina con la familia (1 hr)
+        nextGerente.currentZoneId = 'oficinas_consorcio';
+        nextGerente.targetZoneId = 'oficinas_consorcio';
+
+        // Comportamiento: durante ~5 minutos (minuto 55 a 60 de la visita, o sea a los 25 min de estar en oficina)
+        // se levanta a revisar algo urgente en la PC de la oficina, luego regresa a ver tele con ellos
+        const isUrgentPcCheck = elapsedMin >= 55 && elapsedMin < 60;
+        if (isUrgentPcCheck) {
+          nextGerente.targetWaypoint = 'eq_oc_laptop_diseno';
+          nextGerente.textoAccion = '💻 Revisando algo urgente en el PC de la Oficina (5 min)';
+          const atPc = moveWorldAgentTowardsTarget(nextGerente, 'oficinas_consorcio', 'eq_oc_laptop_diseno');
+          nextGerente.animacionActual = atPc ? 'DESIGN_PC' : null;
+          if (nextEquipos.oc_laptop_diseno) {
+            nextEquipos.oc_laptop_diseno = { ...nextEquipos.oc_laptop_diseno, estado: 'WORK', wattsActuales: 65, operacionActiva: true };
+          }
+        } else {
+          if (nextEquipos.oc_laptop_diseno) {
+            nextEquipos.oc_laptop_diseno = { ...nextEquipos.oc_laptop_diseno, estado: 'OFF', wattsActuales: 0, operacionActiva: false };
+          }
+          nextGerente.targetWaypoint = 'sofa_tv_1';
+          nextGerente.textoAccion = '📺 Viendo tele con mi familia en el clima de la Oficina';
+          const atSofa = moveWorldAgentTowardsTarget(nextGerente, 'oficinas_consorcio', 'sofa_tv_1');
+          nextGerente.animacionActual = atSofa ? 'WATCH_TV_SOFA' : null;
+        }
+      }
     } else {
       const targetZ = nextGerente.targetZoneId || 'taller_publi_imperia';
       const targetW = nextGerente.targetWaypoint || 'eq_pi_pc_diseno';
+      nextGerente.currentZoneId = targetZ;
       const arrivedMgr = moveWorldAgentTowardsTarget(nextGerente, targetZ, targetW);
       if (arrivedMgr) {
         nextGerente.phaseElapsedSec = (nextGerente.phaseElapsedSec || 0) + simDeltaSec;
@@ -1719,6 +1818,7 @@ export const useGameStore = create((set, get) => ({
           nextGerente.autoTaskIndex = ((nextGerente.autoTaskIndex || 0) + 1) % MGR_ROTATION.length;
           const nextR = MGR_ROTATION[nextGerente.autoTaskIndex];
           nextGerente.targetZoneId = nextR.z;
+          nextGerente.currentZoneId = nextR.z;
           nextGerente.targetWaypoint = nextR.wp;
           nextGerente.phaseDurationSec = nextR.dur;
           nextGerente.textoAccion = nextR.txt;

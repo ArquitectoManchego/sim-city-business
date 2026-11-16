@@ -1289,15 +1289,21 @@ export default function GameCanvas3D() {
       });
 
       // Gerente General y Familia según visibilidad del local enfocado
+      const isMgrInActiveZone =
+        freshGame.gerenteState?.currentZoneId === activeFocusedNegId ||
+        freshGame.gerenteState?.targetZoneId === activeFocusedNegId;
+
       if (actorGroupsRef.current.gerente) {
-        actorGroupsRef.current.gerente.visible =
-          isAllConsorcio || freshGame.gerenteState?.negocioActual === activeFocusedNegId;
+        actorGroupsRef.current.gerente.visible = isAllConsorcio || isMgrInActiveZone;
       }
       if (famState?.visitActive && Array.isArray(famState.miembros)) {
         famState.miembros.forEach((fam) => {
           const famMesh = actorGroupsRef.current.familia[fam.sims2Id || fam.id];
           if (famMesh) {
-            famMesh.visible = isAllConsorcio || famState.negocioDestino === activeFocusedNegId;
+            const isFamInActiveZone =
+              famState.locationZone === activeFocusedNegId ||
+              fam.currentZoneId === activeFocusedNegId;
+            famMesh.visible = isAllConsorcio || isFamInActiveZone;
           }
         });
       }
@@ -1396,7 +1402,7 @@ export default function GameCanvas3D() {
           mgrData &&
           actorGroupsRef.current.gerente &&
           actorGroupsRef.current.gerente.visible &&
-          (isAllConsorcio || freshGame.gerenteState?.negocioActual === activeFocusedNegId)
+          (isAllConsorcio || isMgrInActiveZone)
         ) {
           const mgrMesh = actorGroupsRef.current.gerente;
           const mgrY = Math.max(2.05, ((mgrMesh.userData.profile?.heightCm || 175) / 100) + 0.56);
@@ -1415,10 +1421,13 @@ export default function GameCanvas3D() {
         }
 
         // Etiquetas flotantes de la Familia (solo si están en el local visible)
+        const isFamVisibleInScene =
+          isAllConsorcio || famState?.locationZone === activeFocusedNegId;
+
         if (
           famState?.visitActive &&
           Array.isArray(famState.miembros) &&
-          (isAllConsorcio || famState.negocioDestino === activeFocusedNegId)
+          isFamVisibleInScene
         ) {
           famState.miembros.forEach((fam) => {
             const famId = fam.sims2Id || fam.id;
