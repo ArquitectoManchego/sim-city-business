@@ -116,12 +116,12 @@ export const WAYPOINTS_POR_NEGOCIO = {
   hawaiian_paradise: {
     puerta_entrada: [0, 0, 4.6],
     acera_exterior: [-4.5, 0, 5.4],
-    barra_cliente: [-1.2, 0, 0.6],
-    barra_vendedor: [-1.2, 0, -0.6],
-    caja_tpv_cliente: [1.5, 0, 0.6],
-    caja_tpv_vendedor: [1.5, 0, -0.6],
-    barra_entrega_cliente: [0.2, 0, 0.6],
-    barra_entrega_vendedor: [0.2, 0, -0.6],
+    barra_cliente: [-1.2, 0, 0.85],
+    barra_vendedor: [-1.2, 0, -0.65],
+    caja_tpv_cliente: [1.5, 0, 0.85],
+    caja_tpv_vendedor: [1.5, 0, -0.65],
+    barra_entrega_cliente: [0.2, 0, 0.85],
+    barra_entrega_vendedor: [0.2, 0, -0.65],
     // Equipos de preparación (detrás de la barra)
     eq_hp_raspadora: [-4.32, 0, -2.65],
     eq_hp_crepera: [-1.8, 0, -3.4],

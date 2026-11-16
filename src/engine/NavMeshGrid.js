@@ -69,11 +69,13 @@ export function isLocalPointBlocked(lx, lz, negocioId = 'hawaiian_paradise', cus
   }
 
   const blocks = (customBlocksMap && customBlocksMap[negocioId]) || DEFAULT_COLLISION_BLOCKS_POR_NEGOCIO[negocioId] || [];
-  const margin = 0.22; // Radio de colisión del cuerpo del personaje
+  const margin = 0.08; // Radio de colisión optimizado para no trabar personajes en barras y mostradores
 
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i];
     if (b.disabled) continue;
+    // Las mesas, sillas y accesorios donde se sientan o interactúan clientes/familiares no bloquean el paso
+    if (b.tagType === 'ACCESSORY') continue;
     const minX = b.x - b.w / 2 - margin;
     const maxX = b.x + b.w / 2 + margin;
     const minZ = b.z - b.d / 2 - margin;

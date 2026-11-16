@@ -1135,7 +1135,10 @@ export const useGameStore = create((set, get) => ({
 
     const moveActorTowardsWaypoint = (actor, waypointKey, negId, offset = [0, 0, 0]) => {
       const wpMap = WAYPOINTS_POR_NEGOCIO[negId] || WAYPOINTS_POR_NEGOCIO.hawaiian_paradise;
-      const baseCoords = wpMap[waypointKey] || [0, 0, 0];
+      // Sanitizar por si se pasa una clave con sufijos de offset acumulados
+      const cleanWpKey = (waypointKey || 'barra_cliente').replace(/(_-?\d+)+$/, '');
+      const validWp = wpMap[cleanWpKey] ? cleanWpKey : (wpMap[waypointKey] ? waypointKey : 'barra_cliente');
+      const baseCoords = wpMap[validWp] || wpMap.barra_cliente || [0, 0, 1.2];
       const targetCoords = [
         baseCoords[0] + (offset[0] || 0),
         baseCoords[1] + (offset[1] || 0),
@@ -1146,13 +1149,16 @@ export const useGameStore = create((set, get) => ({
       if (distFinal <= 0.18) {
         actor.posicionLocal = [targetCoords[0], 0, targetCoords[2]];
         actor.rutaActual = [];
+        actor.targetWaypoint = validWp;
+        actor._navCacheKey = `${validWp}_${Math.round((offset[0] || 0) * 100)}_${Math.round((offset[2] || 0) * 100)}`;
         return true;
       }
 
       const offsetKey = `${Math.round((offset[0] || 0) * 100)}_${Math.round((offset[2] || 0) * 100)}`;
-      const cacheKey = `${waypointKey}_${offsetKey}`;
-      if (!actor.rutaActual || actor.rutaActual.length === 0 || actor.targetWaypoint !== cacheKey) {
-        actor.targetWaypoint = cacheKey;
+      const cacheKey = `${validWp}_${offsetKey}`;
+      if (!actor.rutaActual || actor.rutaActual.length === 0 || actor._navCacheKey !== cacheKey) {
+        actor._navCacheKey = cacheKey;
+        actor.targetWaypoint = validWp;
         actor.rutaActual = computeLocalPathAStar([ax, 0, az], targetCoords, negId, collisionBlocksMap);
       }
 
@@ -1374,6 +1380,16 @@ export const useGameStore = create((set, get) => ({
             nextBanoOcupado[negId] = null;
           }
         }
+
+        // Liberar clientes asignados cuyo empleado ya no los está atendiendo activamente
+        cola.forEach((c) => {
+          if (c.atendidoPorEmpId) {
+            const empOwner = empLista.find((e) => e.id === c.atendidoPorEmpId);
+            if (!empOwner || empOwner.estado !== 'ATENDIENDO_CLIENTE' || empOwner.clienteActualId !== c.id) {
+              c.atendidoPorEmpId = null;
+            }
+          }
+        });
 
         // C) Asignar cliente esperando O trabajo interno de queue si el empleado está libre
         if (
@@ -1606,13 +1622,23 @@ export const useGameStore = create((set, get) => ({
 
                     const [cliTerminado] = cola.splice(cliIdx, 1);
                     cliTerminado.tieneProductoEnMano = true;
+                    cliTerminado.atendidoPorEmpId = null;
                     let postDestino = 'acera_exterior';
                     if (negId === 'hawaiian_paradise') {
                       if (cliTerminado.decisionPostCompra === 'sentado_mesa') {
-                        postDestino = Math.random() < 0.5 ? 'mesa_1_silla_1' : 'mesa_2_silla_1';
+                        const availableChairs = [
+                          'mesa_1_silla_1',
+                          'mesa_1_silla_2',
+                          'mesa_2_silla_1',
+                          'mesa_2_silla_2'
+                        ].filter((wp) => !(nextPostCompra[negId] || []).some((pc) => pc.targetWaypoint === wp));
+                        postDestino = availableChairs.length > 0 ? availableChairs[0] : 'acera_exterior';
                         cliTerminado.globoTexto = `😋 Disfrutando ${prodVendido.nombre} en mesa`;
                       } else if (cliTerminado.decisionPostCompra === 'de_pie') {
-                        postDestino = Math.random() < 0.5 ? 'consumo_pie_1' : 'consumo_pie_2';
+                        const availableStanding = ['consumo_pie_1', 'consumo_pie_2'].filter(
+                          (wp) => !(nextPostCompra[negId] || []).some((pc) => pc.targetWaypoint === wp)
+                        );
+                        postDestino = availableStanding.length > 0 ? availableStanding[0] : 'acera_exterior';
                         cliTerminado.globoTexto = `🍧 Consumiendo ${prodVendido.nombre} de pie`;
                       }
                     } else {
@@ -1620,7 +1646,7 @@ export const useGameStore = create((set, get) => ({
                     }
                     cliTerminado.targetWaypoint = postDestino;
                     cliTerminado.tiempoRestanteSeg = cliTerminado.tiempoConsumoPostSeg || 15;
-                    nextPostCompra[negId] = [...nextPostCompra[negId], cliTerminado];
+                    nextPostCompra[negId] = [...(nextPostCompra[negId] || []), cliTerminado];
 
                     pushLog(negId, 'sale', `💰 Venta en ${NEGOCIOS_ZONES_3D[negId].nombre}: ${prodVendido.nombre} (+$${(parseFloat(prodVendido.precioVenta) || 45).toFixed(2)} MXN).`);
                     emp.estado = 'IDLE_TASK';
@@ -1854,9 +1880,49 @@ export const useGameStore = create((set, get) => ({
         }
       }
 
+      // 5. Clientes post-compra (Consumo en mesas / de pie, o salida a la calle)
+      const remainingPostCompra = [];
+      const currentPost = nextPostCompra[negId] || [];
+
+      for (let pIdx = 0; pIdx < currentPost.length; pIdx++) {
+        const pCli = { ...currentPost[pIdx] };
+        pCli.tiempoRestanteSeg = (pCli.tiempoRestanteSeg ?? 15) - simDeltaSec;
+
+        const isExiting = pCli.tiempoRestanteSeg <= 0 || pCli.targetWaypoint === 'acera_exterior';
+
+        if (isExiting) {
+          pCli.targetWaypoint = 'acera_exterior';
+          pCli.globoTexto = '¡Gracias, hasta luego!';
+          pCli.animacionActual = 'WALK';
+
+          const [, , pz] = pCli.posicionLocal || [0, 0, 0];
+
+          // Para salir limpiamente del establecimiento:
+          // 1. Si aún está en el interior (pz < 4.4), caminar primero hacia el vano de la puerta frontal
+          // 2. Al cruzar la puerta (pz >= 4.4), caminar hacia la acera exterior
+          const wpTarget = pz < 4.4 ? 'puerta_entrada' : 'acera_exterior';
+          const arrivedExit = moveActorTowardsWaypoint(pCli, wpTarget, negId);
+
+          // Si llegó a la acera exterior, o cruzó el vano de la puerta hacia la calle (pz >= 4.9), o tiempo excedido
+          if (arrivedExit || pz >= 4.9 || pCli.tiempoRestanteSeg < -10) {
+            pushLog(negId, 'client', `👋 ${pCli.nombre} salió satisfecho de ${NEGOCIOS_ZONES_3D[negId].nombre}.`);
+            continue; // Se despawnea del local y no se incluye en remainingPostCompra
+          }
+        } else {
+          // Cliente disfrutando producto en mesa o de pie
+          const arrivedSpot = moveActorTowardsWaypoint(pCli, pCli.targetWaypoint, negId);
+          if (arrivedSpot) {
+            pCli.animacionActual = pCli.targetWaypoint.startsWith('mesa_') ? 'EAT_AT_TABLE' : null;
+          }
+        }
+
+        remainingPostCompra.push(pCli);
+      }
+
       nextEmpleadosLista[negId] = empLista;
       nextEmpleados[negId] = empLista[0];
       nextColas[negId] = cola;
+      nextPostCompra[negId] = remainingPostCompra;
     });
 
     // 5. VISITA FAMILIAR AUTOMÁTICA A LAS 15:15 HRS (Esposa, Alex 12 años y Bárbara 8 años)
