@@ -61,6 +61,31 @@ function seleccionarProductosRapidos(lista = [], max = 10) {
   return seleccionados;
 }
 
+function compactarNombreProducto(prod) {
+  let nombre = (prod?.nombre || '').trim();
+  // Quitar prefijos redundantes de marca repetida (ej. "Pinto - PINTO_CABALLETES", "Fabriano - FABRIANO")
+  const parts = nombre.split(' - ');
+  if (parts.length === 2) {
+    const [marca, resto] = parts;
+    if (resto.toLowerCase().includes(marca.toLowerCase()) || marca.toLowerCase() === 'pinto') {
+      nombre = resto;
+    }
+  }
+  nombre = nombre
+    .replace(/CATALOGO\s*\w*/gi, '')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  // Capitalizar de forma legible si viene todo en mayúsculas
+  if (nombre.length > 4 && nombre === nombre.toUpperCase()) {
+    nombre = nombre.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+  if (nombre.length > 26) {
+    nombre = `${nombre.slice(0, 24).trim()}…`;
+  }
+  return nombre || prod?.nombre || 'Producto';
+}
+
 export default function LiveStatsTickerLog() {
   const liveLogs = useGameStore((s) => s.liveLogs);
   const focusedNegocioId = useGameStore((s) => s.focusedNegocioId);
@@ -77,6 +102,7 @@ export default function LiveStatsTickerLog() {
 
   const [filterNegocio, setFilterNegocio] = useState('ALL');
   const [isSimBarMinimized, setIsSimBarMinimized] = useState(false);
+  const [isProductMenuOpen, setIsProductMenuOpen] = useState(true);
   const [isLogMinimized, setIsLogMinimized] = useState(false);
 
   const activeNegForButtons = NEGOCIOS_ZONES_3D[focusedNegocioId]
@@ -114,40 +140,58 @@ export default function LiveStatsTickerLog() {
           )}
         >
           <div className="flex flex-col gap-1.5 bg-slate-950/92 border border-slate-800 rounded-xl px-3.5 py-2 backdrop-blur-md shadow-xl">
-            {/* Fila A: Simular Cliente + Botón Minimizar */}
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 text-xs">
-                <UserPlus className="w-4 h-4 text-teal-400 shrink-0" />
-                <span className="font-bold text-white">
-                  Simular en{' '}
-                  <span className="text-amber-400">{NEGOCIOS_ZONES_3D[activeNegForButtons].nombre}</span>:
-                </span>
+            {/* Fila A: Simular Venta de Producto (máx. 10, menú colapsable) + Botón Minimizar */}
+            <div className="flex flex-col gap-1.5">
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsProductMenuOpen((v) => !v)}
+                  className="flex items-center gap-2 text-xs text-left hover:opacity-90 transition"
+                  title={isProductMenuOpen ? 'Colapsar menú de productos' : 'Expandir menú de productos'}
+                >
+                  <UserPlus className="w-4 h-4 text-teal-400 shrink-0" />
+                  <span className="font-bold text-white">
+                    Simular venta en{' '}
+                    <span className="text-amber-400">{NEGOCIOS_ZONES_3D[activeNegForButtons].nombre}</span>
+                  </span>
+                  <span className="px-1.5 py-0.5 rounded bg-slate-800 border border-slate-700 text-[10px] text-slate-300 font-semibold flex items-center gap-1">
+                    {productosRapidos.length} productos
+                    {isProductMenuOpen ? (
+                      <ChevronUp className="w-3 h-3 text-teal-400" />
+                    ) : (
+                      <ChevronDown className="w-3 h-3 text-teal-400" />
+                    )}
+                  </span>
+                </button>
+
+                <button
+                  onClick={() => setIsSimBarMinimized(true)}
+                  className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition"
+                  title="Esconder panel hacia icono"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
               </div>
 
-              <div className="flex flex-wrap items-center gap-1">
-                {productosRapidos.map((prod) => (
-                  <button
-                    key={prod.id}
-                    onClick={() => {
-                      setFocusedNegocioId(activeNegForButtons);
-                      spawnCustomerNow(activeNegForButtons, prod.id);
-                    }}
-                    className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-teal-950 border border-slate-700 hover:border-teal-500/60 text-slate-200 hover:text-teal-200 text-[10px] font-semibold transition flex items-center gap-1"
-                  >
-                    <Sparkles className="w-2.5 h-2.5 text-amber-400" />
-                    <span className="truncate max-w-[165px]">{prod.nombre}</span>
-                    <span className="text-emerald-400 font-mono">(${prod.precioVenta})</span>
-                  </button>
-                ))}
-              </div>
-
-              <button
-                onClick={() => setIsSimBarMinimized(true)}
-                className="p-1 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700 transition"
-                title="Esconder panel hacia icono"
-              >
-                <ChevronDown className="w-3.5 h-3.5" />
-              </button>
+              {isProductMenuOpen && (
+                <div className="flex flex-wrap items-center gap-1">
+                  {productosRapidos.map((prod) => (
+                    <button
+                      key={prod.id}
+                      title={prod.nombre}
+                      onClick={() => {
+                        setFocusedNegocioId(activeNegForButtons);
+                        spawnCustomerNow(activeNegForButtons, prod.id);
+                      }}
+                      className="px-2 py-0.5 rounded-lg bg-slate-900 hover:bg-teal-950 border border-slate-700 hover:border-teal-500/60 text-slate-200 hover:text-teal-200 text-[10px] font-semibold transition flex items-center gap-1"
+                    >
+                      <Sparkles className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                      <span>{compactarNombreProducto(prod)}</span>
+                      <span className="text-emerald-400 font-mono">(${prod.precioVenta})</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Fila B: Multi-Empleado (+ Agregar Empleado / Hora Comida 1-2 ó 2-3 PM) + Gerente + Familia */}
