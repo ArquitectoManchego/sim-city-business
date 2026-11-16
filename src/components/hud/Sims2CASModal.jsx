@@ -335,16 +335,21 @@ export default function Sims2CASModal() {
                     <div>
                       <label className="block text-[11px] font-bold text-cyan-300 mb-1">Chasis Esquelético GLB</label>
                       <select
-                        value={profile.baseModel || 'male_base'}
+                        value={profile.baseModel || 'male_casual'}
                         onChange={(e) => {
                           const m = e.target.value;
-                          patchProfile({ baseModel: m, gender: m === 'male_base' ? 'M' : 'F' });
+                          patchProfile({ baseModel: m, gender: m.includes('female') ? 'F' : 'M' });
                         }}
                         className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold"
                       >
-                        <option value="male_base">Masculino Rigged 67 Huesos (GLB)</option>
-                        <option value="female_base">Femenino Clásico Rigged (GLB)</option>
-                        <option value="female_casual">Femenino Casual Rigged + Lentes (GLB)</option>
+                        <option value="male_casual">Masculino Casual Veracruz (Polo / Jeans / Tenis)</option>
+                        <option value="male_base">Masculino Base Rigged 67 Huesos (GLB)</option>
+                        <option value="female_casual">Femenino Casual Veracruz (Polo / Jeans / Tenis)</option>
+                        <option value="female_base">Femenino Base Rigged 67 Huesos (GLB)</option>
+                        <option value="doctor_male">Médico / Especialista Clínico Masculino (Bata / Uniforme)</option>
+                        <option value="doctor_female">Médico / Especialista Clínico Femenino (Bata / Uniforme)</option>
+                        <option value="nurse_male">Enfermero Clínico / Quirúrgico (M)</option>
+                        <option value="nurse_female">Enfermera Clínica / Quirúrgica (F)</option>
                       </select>
                     </div>
                     <div>

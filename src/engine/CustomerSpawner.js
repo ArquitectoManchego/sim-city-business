@@ -12,17 +12,41 @@ export const ARQUETIPOS_CLIENTE = [
     id: 'estudiante_univ',
     nombre: 'Estudiante Universitario',
     colorCamisa: '#38bdf8',
-    presupuestoMax: 120,
+    presupuestoMax: 150,
     negociosFrecuentes: ['hawaiian_paradise', 'papeleria_imperiarte', 'taller_publi_imperia'],
     preferenciaPostCompra: { sentado: 0.45, de_pie: 0.30, salir: 0.25 }
   },
   {
-    id: 'medico_enfermera',
-    nombre: 'Médico / Enfermera Clínica',
-    colorCamisa: '#14b8a6',
-    presupuestoMax: 2500,
+    id: 'doctor_medico',
+    nombre: 'Médico / Especialista Clínico',
+    colorCamisa: '#ffffff',
+    presupuestoMax: 3500,
     negociosFrecuentes: ['imperia_uniformes', 'hawaiian_paradise', 'bordados_veracruz'],
     preferenciaPostCompra: { sentado: 0.20, de_pie: 0.20, salir: 0.60 }
+  },
+  {
+    id: 'enfermera_clinica',
+    nombre: 'Enfermera / Enfermero Clínico',
+    colorCamisa: '#14b8a6',
+    presupuestoMax: 2200,
+    negociosFrecuentes: ['imperia_uniformes', 'hawaiian_paradise', 'bordados_veracruz'],
+    preferenciaPostCompra: { sentado: 0.25, de_pie: 0.25, salir: 0.50 }
+  },
+  {
+    id: 'estudiante_medicina',
+    nombre: 'Estudiante de Medicina (Facultad UV)',
+    colorCamisa: '#ffffff',
+    presupuestoMax: 1600,
+    negociosFrecuentes: ['imperia_uniformes', 'papeleria_imperiarte', 'hawaiian_paradise'],
+    preferenciaPostCompra: { sentado: 0.35, de_pie: 0.30, salir: 0.35 }
+  },
+  {
+    id: 'estudiante_enfermeria',
+    nombre: 'Estudiante de Enfermería (Facultad UV)',
+    colorCamisa: '#ffffff',
+    presupuestoMax: 1300,
+    negociosFrecuentes: ['imperia_uniformes', 'papeleria_imperiarte', 'hawaiian_paradise'],
+    preferenciaPostCompra: { sentado: 0.35, de_pie: 0.30, salir: 0.35 }
   },
   {
     id: 'chef_restaurantero',
@@ -51,9 +75,10 @@ export const ARQUETIPOS_CLIENTE = [
 ];
 
 const NOMBRES_CLIENTES = [
-  'Sofía M.', 'Carlos R.', 'Dra. Elena V.', 'Chef Marco A.', 'Valeria G.', 'Ing. Roberto T.',
-  'Fernanda L.', 'Dr. Alejandro P.', 'Mariana C.', 'Luis E.', 'Camila H.', 'Arq. Daniel S.',
-  'Mónica B.', 'Jorge N.', 'Lucía F.', 'Dr. Ricardo M.'
+  'Dr. Alejandro P.', 'Dra. Elena V.', 'Enf. Mariana C.', 'Enf. Carlos R.',
+  'Méd. Interno Daniel S.', 'Est. Valeria G.', 'Dr. Ricardo M.', 'Dra. Sofía M.',
+  'Enf. Lucía F.', 'Chef Marco A.', 'Ing. Roberto T.', 'Fernanda L.', 'Luis E.',
+  'Camila H.', 'Mónica B.', 'Jorge N.'
 ];
 
 /**

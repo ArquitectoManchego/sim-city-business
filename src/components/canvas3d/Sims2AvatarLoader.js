@@ -5,9 +5,14 @@ import { GLTFLoader, SkeletonUtils } from 'three-stdlib';
 // CATÁLOGOS THE SIMS 2 CAS (PIEL, COMPLEXIÓN, CABELLO, PRENDAS, 27 SLIDERS)
 // ============================================================================
 export const SIMS2_MODEL_PATHS = {
+  male_casual: '/models/sims2/male_casual.glb',
   male_base: '/models/sims2/male_base.glb',
+  female_casual: '/models/sims2/female_casual.glb',
   female_base: '/models/sims2/female_base.glb',
-  female_casual: '/models/sims2/female_casual.glb'
+  doctor_male: '/models/sims2/doctor_male.glb',
+  doctor_female: '/models/sims2/doctor_female.glb',
+  nurse_male: '/models/sims2/nurse_male.glb',
+  nurse_female: '/models/sims2/nurse_female.glb'
 };
 
 export const SIMS2_SKIN_TONES = [
@@ -260,11 +265,11 @@ export function createDefaultSims2Profiles() {
       id: 'gerente',
       displayName: 'Alex (Gerente General)',
       roleTag: 'Gerente / Diseñador Principal',
-      baseModel: 'male_base',
+      baseModel: 'male_casual',
       gender: 'M',
-      age: 38,
+      age: 42,
       heightCm: 176,
-      weightKg: 76,
+      weightKg: 77,
       shoulderCm: 46,
       bustCm: 100,
       waistCm: 84,
@@ -277,8 +282,10 @@ export function createDefaultSims2Profiles() {
       hairColor: '#1e1b18',
       topStyle: 'polo',
       topColor: '#facc15',
+      topFabric: 'algodon',
       bottomStyle: 'jeans',
       bottomColor: '#1e293b',
+      bottomFabric: 'mezclilla',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: true,
@@ -297,17 +304,17 @@ export function createDefaultSims2Profiles() {
     familia_esposa: {
       ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_esposa',
-      displayName: 'Esposa (Familia)',
-      roleTag: 'Familia — Visita 3–4 PM',
+      displayName: 'Esposa (42 años)',
+      roleTag: 'Esposa — Familia',
       baseModel: 'female_casual',
       gender: 'F',
-      age: 35,
+      age: 42,
       heightCm: 163,
-      weightKg: 58,
+      weightKg: 60,
       shoulderCm: 38,
-      bustCm: 90,
-      waistCm: 68,
-      hipCm: 95,
+      bustCm: 92,
+      waistCm: 72,
+      hipCm: 96,
       complexion: 'media',
       skinTone: 'S2',
       skinColor: '#e2af8c',
@@ -315,23 +322,17 @@ export function createDefaultSims2Profiles() {
       hairStyle: 'largo_liso',
       hairColor: '#3b2314',
       topStyle: 'camisa',
-      topColor: '#ec4899',
-      bottomStyle: 'jeans',
+      topColor: '#f472b6',
+      topFabric: 'lino',
+      bottomStyle: 'pantalon_vestir',
       bottomColor: '#334155',
+      bottomFabric: 'algodon',
       shoeColor: '#1e293b',
       hasGlasses: false,
       hasAura: true,
       auraColor: '#f472b6',
       showPlumbob: true,
-      glutesVolume: 0.7,
-      glutesFat: 0.35,
-      glutesMuscle: 0.4,
-      glutesRoundness: 0.9,
-      glutesShape: 'bubblebutt',
-      bustCup: 'D',
-      bustShape: 'semi_esfera',
-      topFabric: 'seda',
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, cheekboneWidth: 0.2, eyeSize: 0.2, mouthCornerCurve: 0.25 },
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, cheekboneWidth: 0.15, eyeSize: 0.15, mouthCornerCurve: 0.2 },
       accessories: {
         reloj: 'clasico_oro',
         gorra: 'ninguno',
@@ -342,70 +343,82 @@ export function createDefaultSims2Profiles() {
       }
     },
     familia_alex: {
+      ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_alex',
       displayName: 'Alex Jr. (12 años)',
-      roleTag: 'Hijo 12 años — Visita 3–4 PM',
-      baseModel: 'male_base',
+      roleTag: 'Hijo 12 años — Familia',
+      baseModel: 'male_casual',
       gender: 'M',
       age: 12,
-      heightCm: 150,
-      weightKg: 43,
-      shoulderCm: 36,
-      bustCm: 74,
-      waistCm: 64,
-      hipCm: 78,
+      heightCm: 148,
+      weightKg: 41,
+      shoulderCm: 34,
+      bustCm: 72,
+      waistCm: 62,
+      hipCm: 74,
       complexion: 'delgada',
       skinTone: 'S2',
       skinColor: '#e0ab88',
       eyeColor: '#3b2416',
       hairStyle: 'corto_ejecutivo',
       hairColor: '#261c15',
-      topStyle: 'hoodie',
-      topColor: '#38bdf8',
+      topStyle: 'polo',
+      topColor: '#0284c7',
+      topFabric: 'algodon',
       bottomStyle: 'jeans',
       bottomColor: '#1e3a8a',
-      shoeColor: '#e2e8f0',
+      bottomFabric: 'mezclilla',
+      shoeColor: '#f8fafc',
       hasGlasses: false,
       hasAura: true,
       auraColor: '#38bdf8',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.3, faceWidth: -0.1, jawWidth: -0.25 }
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.25, faceWidth: -0.1, jawWidth: -0.2 }
     },
     familia_barbara: {
+      ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_barbara',
       displayName: 'Bárbara (8 años)',
-      roleTag: 'Hija 8 años — Visita 3–4 PM',
-      baseModel: 'female_base',
+      roleTag: 'Hija 8 años — Familia',
+      baseModel: 'female_casual',
       gender: 'F',
       age: 8,
-      heightCm: 126,
-      weightKg: 27,
-      shoulderCm: 32,
-      bustCm: 64,
+      heightCm: 124,
+      weightKg: 25,
+      shoulderCm: 29,
+      bustCm: 58,
       waistCm: 56,
-      hipCm: 68,
+      hipCm: 62,
+      bustCup: 'A',
+      bustShape: 'semi_esfera',
+      glutesVolume: 0,
+      glutesFat: 0,
+      glutesMuscle: 0,
+      glutesRoundness: 0,
       complexion: 'delgada',
       skinTone: 'S1',
       skinColor: '#f1c6ab',
       eyeColor: '#452b1a',
       hairStyle: 'ondulado_casual',
       hairColor: '#3b2618',
-      topStyle: 'tshirt',
+      topStyle: 'polo',
       topColor: '#a855f7',
-      bottomStyle: 'falda',
+      topFabric: 'algodon',
+      bottomStyle: 'bermuda',
       bottomColor: '#1e1b4b',
+      bottomFabric: 'algodon',
       shoeColor: '#f8fafc',
       hasGlasses: false,
       hasAura: true,
       auraColor: '#c084fc',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.35, cheekboneWidth: 0.25, jawWidth: -0.35 }
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, eyeSize: 0.3, cheekboneWidth: 0.2, jawWidth: -0.3 }
     },
     emp_hawaiian_paradise_0: {
       id: 'emp_hawaiian_paradise_0',
       displayName: 'Barista Hawaiian #1',
       roleTag: 'Hawaiian Paradise',
-      baseModel: 'female_base',
+      baseModel: 'female_casual',
       gender: 'F',
       age: 24,
       heightCm: 164,
@@ -422,8 +435,10 @@ export function createDefaultSims2Profiles() {
       hairColor: '#1f1612',
       topStyle: 'polo',
       topColor: '#f59e0b',
-      bottomStyle: 'jeans',
+      topFabric: 'algodon',
+      bottomStyle: 'bermuda',
       bottomColor: '#1e293b',
+      bottomFabric: 'algodon',
       shoeColor: '#111827',
       hasGlasses: false,
       hasAura: false,
@@ -449,10 +464,12 @@ export function createDefaultSims2Profiles() {
       eyeColor: '#3b2416',
       hairStyle: 'largo_liso',
       hairColor: '#2d1c12',
-      topStyle: 'filipina',
+      topStyle: 'polo',
       topColor: '#10b981',
+      topFabric: 'algodon',
       bottomStyle: 'pantalon_vestir',
       bottomColor: '#064e3b',
+      bottomFabric: 'gabardina',
       shoeColor: '#0f172a',
       hasGlasses: true,
       hasAura: false,
@@ -463,7 +480,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_papeleria_imperiarte_0',
       displayName: 'Encargado Papelería #1',
       roleTag: 'Papelería Imperiarte',
-      baseModel: 'male_base',
+      baseModel: 'male_casual',
       gender: 'M',
       age: 26,
       heightCm: 173,
@@ -480,8 +497,10 @@ export function createDefaultSims2Profiles() {
       hairColor: '#141414',
       topStyle: 'polo',
       topColor: '#3b82f6',
-      bottomStyle: 'pantalon_vestir',
+      topFabric: 'algodon',
+      bottomStyle: 'jeans',
       bottomColor: '#1e293b',
+      bottomFabric: 'mezclilla',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: false,
@@ -492,7 +511,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_bordados_veracruz_0',
       displayName: 'Operador Bordados #1',
       roleTag: 'Bordados Veracruz',
-      baseModel: 'male_base',
+      baseModel: 'male_casual',
       gender: 'M',
       age: 32,
       heightCm: 174,
@@ -509,8 +528,10 @@ export function createDefaultSims2Profiles() {
       hairColor: '#111111',
       topStyle: 'polo',
       topColor: '#f43f5e',
+      topFabric: 'algodon',
       bottomStyle: 'cargo',
       bottomColor: '#334155',
+      bottomFabric: 'gabardina',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: false,
@@ -521,7 +542,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_taller_costura_0',
       displayName: 'Costurera Maestra #1',
       roleTag: 'Taller Imperia Costura',
-      baseModel: 'female_base',
+      baseModel: 'female_casual',
       gender: 'F',
       age: 39,
       heightCm: 160,
@@ -536,10 +557,12 @@ export function createDefaultSims2Profiles() {
       eyeColor: '#2a1a10',
       hairStyle: 'ondulado_casual',
       hairColor: '#241710',
-      topStyle: 'filipina',
+      topStyle: 'polo',
       topColor: '#a855f7',
+      topFabric: 'algodon',
       bottomStyle: 'pantalon_vestir',
       bottomColor: '#1e1b4b',
+      bottomFabric: 'algodon',
       shoeColor: '#111827',
       hasGlasses: false,
       hasAura: false,
@@ -550,7 +573,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_taller_publi_imperia_0',
       displayName: 'Operador / Prensa Publi #1',
       roleTag: 'Publi-Impresos',
-      baseModel: 'male_base',
+      baseModel: 'male_casual',
       gender: 'M',
       age: 27,
       heightCm: 175,
@@ -565,10 +588,12 @@ export function createDefaultSims2Profiles() {
       eyeColor: '#2b1b12',
       hairStyle: 'corto_ejecutivo',
       hairColor: '#1c1512',
-      topStyle: 'tshirt',
+      topStyle: 'polo',
       topColor: '#06b6d4',
+      topFabric: 'algodon',
       bottomStyle: 'cargo',
       bottomColor: '#1e293b',
+      bottomFabric: 'gabardina',
       shoeColor: '#0f172a',
       hasGlasses: false,
       hasAura: false,
@@ -589,46 +614,124 @@ export function createDefaultSims2Profiles() {
   return profiles;
 }
 
-export function buildCustomerSims2Profile(customerId, shirtColorHex = '#3b82f6') {
+export function buildCustomerSims2Profile(customerId, shirtColorHex = '#3b82f6', archetypeId = null) {
   let hash = 0;
   for (let i = 0; i < String(customerId).length; i++) {
     hash = (hash * 31 + String(customerId).charCodeAt(i)) >>> 0;
   }
-  const models = ['male_base', 'female_base', 'female_casual'];
-  const baseModel = models[hash % models.length];
-  const isMale = baseModel === 'male_base';
+  const isMale = (hash % 2 === 0);
   const skinObj = SIMS2_SKIN_TONES[hash % SIMS2_SKIN_TONES.length];
   const compObj = SIMS2_COMPLEXIONS[(hash >>> 2) % 3]; // delgada, atletica, media
   const pantPalette = ['#1e293b', '#334155', '#0f172a', '#3f3f46', '#1e3a8a'];
   const hairPalette = ['#111111', '#2c1b12', '#4a3020', '#6b4728', '#8c6239'];
+
+  let baseModel = isMale ? 'male_casual' : 'female_casual';
+  let displayName = 'Cliente';
+  let topStyle = (hash % 2 === 0) ? 'polo' : 'tshirt';
+  let topColor = shirtColorHex;
+  let topFabric = 'algodon';
+  let bottomStyle = 'jeans';
+  let bottomColor = pantPalette[hash % pantPalette.length];
+  let bottomFabric = 'mezclilla';
+  let shoeColor = '#111827';
+  let accessories = { ...DEFAULT_BODY_MEASUREMENTS.accessories };
+
+  if (archetypeId === 'doctor_medico') {
+    baseModel = isMale ? 'doctor_male' : 'doctor_female';
+    displayName = isMale ? 'Dr. Especialista' : 'Dra. Especialista';
+    topStyle = 'filipina';
+    topColor = '#ffffff';
+    topFabric = 'antifluido';
+    bottomStyle = 'pantalon_vestir';
+    bottomColor = '#0284c7';
+    bottomFabric = 'antifluido';
+    shoeColor = '#f8fafc';
+  } else if (archetypeId === 'enfermera_clinica') {
+    baseModel = isMale ? 'nurse_male' : 'nurse_female';
+    displayName = isMale ? 'Enfermero Clínico' : 'Enfermera Clínica';
+    topStyle = 'filipina';
+    topColor = '#14b8a6';
+    topFabric = 'antifluido';
+    bottomStyle = 'pantalon_vestir';
+    bottomColor = '#0f766e';
+    bottomFabric = 'antifluido';
+    shoeColor = '#f8fafc';
+  } else if (archetypeId === 'estudiante_medicina') {
+    baseModel = isMale ? 'doctor_male' : 'doctor_female';
+    displayName = 'Estudiante Medicina UV';
+    topStyle = 'filipina';
+    topColor = '#ffffff';
+    topFabric = 'antifluido';
+    bottomStyle = 'pantalon_vestir';
+    bottomColor = '#ffffff';
+    bottomFabric = 'antifluido';
+    shoeColor = '#ffffff';
+  } else if (archetypeId === 'estudiante_enfermeria') {
+    baseModel = isMale ? 'nurse_male' : 'nurse_female';
+    displayName = 'Estudiante Enfermería UV';
+    topStyle = 'filipina';
+    topColor = '#ffffff';
+    topFabric = 'antifluido';
+    bottomStyle = 'pantalon_vestir';
+    bottomColor = '#ffffff';
+    bottomFabric = 'antifluido';
+    shoeColor = '#ffffff';
+  } else if (archetypeId === 'chef_restaurantero') {
+    baseModel = isMale ? 'male_casual' : 'female_casual';
+    displayName = 'Chef Gastrónomo';
+    topStyle = 'filipina';
+    topColor = '#ffffff';
+    topFabric = 'gabardina';
+    bottomStyle = 'pantalon_vestir';
+    bottomColor = '#1e293b';
+    accessories.gorra = 'cofia_chef';
+  } else if (archetypeId === 'cliente_corporativo') {
+    baseModel = isMale ? 'male_casual' : 'female_casual';
+    displayName = 'Cliente Corporativo';
+    topStyle = 'camisa';
+    topColor = '#f8fafc';
+    bottomStyle = 'pantalon_vestir';
+    bottomColor = '#1e293b';
+  } else if (archetypeId === 'estudiante_univ') {
+    baseModel = isMale ? 'male_casual' : 'female_casual';
+    displayName = 'Estudiante Universitario';
+    topStyle = 'polo';
+    topColor = '#38bdf8';
+    bottomStyle = 'jeans';
+    bottomColor = '#1e3a8a';
+  }
+
   return {
     ...DEFAULT_BODY_MEASUREMENTS,
     id: `cust_${customerId}`,
-    displayName: 'Cliente',
+    displayName,
     baseModel,
     gender: isMale ? 'M' : 'F',
-    age: 20 + (hash % 32),
-    heightCm: isMale ? 168 + (hash % 14) : 156 + (hash % 12),
-    weightKg: isMale ? 66 + (hash % 18) : 53 + (hash % 14),
-    shoulderCm: isMale ? 43 : 37,
-    bustCm: isMale ? 96 : 88,
-    waistCm: isMale ? 80 : 68,
-    hipCm: isMale ? 95 : 94,
+    age: 20 + (hash % 35),
+    heightCm: isMale ? 172 + (hash % 10) : 160 + (hash % 8),
+    weightKg: isMale ? 70 + (hash % 14) : 56 + (hash % 10),
+    shoulderCm: isMale ? 44 : 38,
+    bustCm: isMale ? 98 : 88,
+    waistCm: isMale ? 82 : 70,
+    hipCm: isMale ? 96 : 95,
     complexion: compObj.id,
     skinTone: skinObj.id,
     skinColor: skinObj.hex,
     eyeColor: '#2c1e16',
     hairStyle: 'nativo',
     hairColor: hairPalette[hash % hairPalette.length],
-    topStyle: (hash % 3 === 0) ? 'camisa' : 'tshirt',
-    topColor: shirtColorHex,
-    bottomStyle: 'jeans',
-    bottomColor: pantPalette[hash % pantPalette.length],
-    shoeColor: '#111827',
-    hasGlasses: baseModel === 'female_casual' && hash % 4 === 0,
+    topStyle,
+    topColor,
+    topFabric,
+    bottomStyle,
+    bottomColor,
+    bottomFabric,
+    shoeColor,
+    hasGlasses: hash % 5 === 0,
     hasAura: false,
     showPlumbob: false,
-    faceSliders: { ...DEFAULT_FACE_SLIDERS }
+    faceSliders: { ...DEFAULT_FACE_SLIDERS },
+    accessories
   };
 }
 
@@ -1234,9 +1337,9 @@ export function preloadSims2Assets() {
         clonedGeom.applyMatrix4(hairToHeadLocal);
         clonedGeom.morphAttributes = {};
         const presetId =
-          key === 'male_base'
+          key.includes('male')
             ? 'corto_ejecutivo'
-            : key === 'female_base'
+            : key.includes('female_base')
               ? 'ondulado_casual'
               : 'largo_liso';
         assetCache.hairPresets[presetId] = {
@@ -1364,6 +1467,9 @@ export function syncSims2Garments3D(actorGroup, profile) {
     const oldRightP = bones.RightUpLeg.getObjectByName('sims2_leg_pocket_right');
     if (oldRightP) bones.RightUpLeg.remove(oldRightP);
   }
+
+  const isMedicalBase = ['doctor_male', 'doctor_female', 'nurse_male', 'nurse_female'].includes(profile.baseModel);
+  if (isMedicalBase) return;
 
   const topCol = new THREE.Color(profile.topColor || '#3b82f6');
   const bottomCol = new THREE.Color(profile.bottomColor || '#1e293b');
@@ -1875,6 +1981,23 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
     cheekSquintRight: Math.max(0, fs.cheekboneWidth * 0.45)
   };
 
+  if (profile.age && profile.age < 14) {
+    morphValues.sims2_bust = 0;
+    morphValues.sims2_bust_cup = 0;
+    morphValues.sims2_bust_pera = 0;
+    morphValues.sims2_bust_pico = 0;
+    morphValues.sims2_bust_esfera = 0;
+    morphValues.sims2_bust_semi_esfera = 0;
+    morphValues.sims2_glutes_volume = 0;
+    morphValues.sims2_glutes_bubblebutt = 0;
+    morphValues.sims2_glutes_corazon = 0;
+    morphValues.sims2_glutes_gota = 0;
+    morphValues.sims2_glutes_fat = 0;
+    morphValues.sims2_glutes_muscle = 0;
+    morphValues.sims2_waist = 0;
+    morphValues.sims2_hips = 0;
+  }
+
   rigRoot.traverse((obj) => {
     if (!obj.isMesh) return;
 
@@ -1939,6 +2062,8 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
   // 4. Swapping de pelucas personalizadas en el hueso Head
   const headBone = actorGroup.userData.bones?.Head;
   if (headBone) {
+    const childHeadScale = profile.age && profile.age <= 8 ? 1.20 : profile.age && profile.age <= 12 ? 1.08 : 1.0;
+    headBone.scale.set(childHeadScale, childHeadScale, childHeadScale);
     let customHairMesh = headBone.getObjectByName('sims2_custom_hair_attachment');
     if (profile.hairStyle && profile.hairStyle !== 'nativo' && profile.hairStyle !== 'calvo') {
       const preset = assetCache.hairPresets[profile.hairStyle];
