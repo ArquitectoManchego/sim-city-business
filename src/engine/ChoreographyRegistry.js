@@ -145,6 +145,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     mesa_2_silla_1: [-0.8, 0, 3.0],
     mesa_2_silla_2: [0.6, 0, 3.0],
     bano_empleado: [-4.8, 0, 1.0],
+    espera_bano: [-3.8, 0, 1.0],
     espera_1: [2.4, 0, 1.8]
   },
 
@@ -174,6 +175,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     probador_1: [-4.3, 0, 2.2],
     probador_2: [-4.3, 0, 3.6],
     bano_empleado: [-4.6, 0, 0.2],
+    espera_bano: [-3.6, 0, 0.2],
     espera_1: [2.5, 0, 2.4],
     espera_showroom_1: [2.5, 0, 2.4],
     espera_showroom_2: [3.8, 0, 2.4]
@@ -199,6 +201,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     rack_marcadores_dibujo: [2.8, 0, -0.2],
     rack_pinceles_herramientas: [4.2, 0, -0.2],
     bano_empleado: [-4.6, 0, 1.0],
+    espera_bano: [-3.6, 0, 1.0],
     espera_1: [-3.0, 0, 2.5],
     espera_2: [2.8, 0, 2.5]
   },
@@ -217,6 +220,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     raw_estante_hilos: [-4.4, 0, -1.2],
     raw_mesa_bastidores: [0.0, 0, -2.2],
     bano_empleado: [4.6, 0, -1.0],
+    espera_bano: [3.6, 0, -1.0],
     espera_1: [3.2, 0, 2.6]
   },
 
@@ -237,6 +241,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     raw_mesa_corte_telas: [-3.0, 0, -1.2],
     raw_estante_avios: [-1.6, 0, -1.2],
     bano_empleado: [-4.6, 0, 2.5],
+    espera_bano: [-3.6, 0, 2.5],
     espera_1: [3.0, 0, 2.8]
   },
 
@@ -258,6 +263,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     raw_almacen_b2b: [4.4, 0, 2.0],
     raw_mesa_impresion: [-2.2, 0, -1.8],
     bano_empleado: [-4.6, 0, 2.4],
+    espera_bano: [-3.6, 0, 2.4],
     espera_1: [3.0, 0, 2.8]
   },
 
@@ -273,6 +279,7 @@ export const WAYPOINTS_POR_NEGOCIO = {
     mesa_comer_1: [-2.2, 0, 1.4],
     mesa_comer_2: [-1.0, 0, 1.4],
     bano_empleado: [-3.4, 0, 2.8],
+    espera_bano: [-2.4, 0, 2.8],
     espera_1: [1.5, 0, 1.5]
   }
 };

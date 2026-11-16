@@ -196,6 +196,12 @@ function createEmployeeEntity(negId, index, customMeta = {}) {
     maxRestroomsToday: 2 + (index % 4), // 2..5 por día
     nextRestroomTriggerSec: 1800 + index * 900,
     workSecondsToday: 0,
+    // Estado y mutex de baño
+    isInsideRestroom: false,
+    isWaitingRestroom: false,
+    restroomNeedType: null,
+    restroomElapsedSec: 0,
+    restroomDurationSec: 0,
     imperiaOpeningDoneToday: false,
     imperiaClosingDoneToday: false,
     imperiaOpenPhaseIndex: 0,
@@ -391,6 +397,16 @@ export const useGameStore = create((set, get) => ({
     taller_costura: [],
     taller_publi_imperia: []
   },
+  // Mutex de baños (1 persona a la vez por local)
+  banoOcupadoPorNegocio: {
+    hawaiian_paradise: null,
+    imperia_uniformes: null,
+    papeleria_imperiarte: null,
+    bordados_veracruz: null,
+    taller_costura: null,
+    taller_publi_imperia: null,
+    oficinas_consorcio: null
+  },
   spawnAccumulators: {
     hawaiian_paradise: 0.72,
     imperia_uniformes: 0.65,
@@ -526,6 +542,52 @@ export const useGameStore = create((set, get) => ({
       return {
         empleadosListaPorNegocio: { ...state.empleadosListaPorNegocio, [negocioId]: nextList },
         empleadosPorNegocio: { ...state.empleadosPorNegocio, [negocioId]: nextList[0] || state.empleadosPorNegocio[negocioId] }
+      };
+    }),
+
+  triggerCustomerRestroomRequest: (negocioId, customerId, needType = 'manos') =>
+    set((state) => {
+      const colas = { ...state.clientesColaPorNegocio };
+      const list = [...(colas[negocioId] || [])];
+      const durations = { manos: 10, del_1: 20, del_2: 45 };
+      const dur = durations[needType] || 15;
+      const idx = list.findIndex((c) => c.id === customerId);
+      if (idx !== -1) {
+        list[idx] = {
+          ...list[idx],
+          solicitoBano: true,
+          necesidadBano: needType,
+          tiempoBanoRestanteSeg: dur,
+          banoCompletado: false,
+          isInsideRestroom: false,
+          isWaitingRestroom: false
+        };
+        colas[negocioId] = list;
+      }
+      return { clientesColaPorNegocio: colas };
+    }),
+
+  triggerEmployeeRestroomRequest: (negocioId, empId) =>
+    set((state) => {
+      const empMap = { ...state.empleadosListaPorNegocio };
+      const list = [...(empMap[negocioId] || [])];
+      const idx = list.findIndex((e) => e.id === empId);
+      if (idx !== -1) {
+        list[idx] = {
+          ...list[idx],
+          estado: 'RUTINA_HUMANA',
+          clienteActualId: null,
+          recetaActual: null,
+          humanRoutineActual: UNIVERSAL_HUMAN_ROUTINES[0],
+          humanRoutineElapsedSec: 0,
+          isInsideRestroom: false,
+          isWaitingRestroom: false
+        };
+        empMap[negocioId] = list;
+      }
+      return {
+        empleadosListaPorNegocio: empMap,
+        empleadosPorNegocio: { ...state.empleadosPorNegocio, [negocioId]: list[0] || state.empleadosPorNegocio[negocioId] }
       };
     }),
 
@@ -1071,9 +1133,14 @@ export const useGameStore = create((set, get) => ({
 
     const walkSpeedMps = state.timeScale > 20 ? 6.5 : 2.4;
 
-    const moveActorTowardsWaypoint = (actor, waypointKey, negId) => {
+    const moveActorTowardsWaypoint = (actor, waypointKey, negId, offset = [0, 0, 0]) => {
       const wpMap = WAYPOINTS_POR_NEGOCIO[negId] || WAYPOINTS_POR_NEGOCIO.hawaiian_paradise;
-      const targetCoords = wpMap[waypointKey] || [0, 0, 0];
+      const baseCoords = wpMap[waypointKey] || [0, 0, 0];
+      const targetCoords = [
+        baseCoords[0] + (offset[0] || 0),
+        baseCoords[1] + (offset[1] || 0),
+        baseCoords[2] + (offset[2] || 0)
+      ];
       const [ax, , az] = actor.posicionLocal || [0, 0, 0];
       const distFinal = Math.hypot(targetCoords[0] - ax, targetCoords[2] - az);
       if (distFinal <= 0.18) {
@@ -1082,8 +1149,10 @@ export const useGameStore = create((set, get) => ({
         return true;
       }
 
-      if (!actor.rutaActual || actor.rutaActual.length === 0 || actor.targetWaypoint !== waypointKey) {
-        actor.targetWaypoint = waypointKey;
+      const offsetKey = `${Math.round((offset[0] || 0) * 100)}_${Math.round((offset[2] || 0) * 100)}`;
+      const cacheKey = `${waypointKey}_${offsetKey}`;
+      if (!actor.rutaActual || actor.rutaActual.length === 0 || actor.targetWaypoint !== cacheKey) {
+        actor.targetWaypoint = cacheKey;
         actor.rutaActual = computeLocalPathAStar([ax, 0, az], targetCoords, negId, collisionBlocksMap);
       }
 
@@ -1188,11 +1257,16 @@ export const useGameStore = create((set, get) => ({
       };
     };
 
+    // Mutex de baños (1 persona a la vez por local)
+    const nextBanoOcupado = { ...(state.banoOcupadoPorNegocio || {}) };
+
     // Procesar cada unidad de negocio con soporte multi-empleado (1..4) y queues inter-empresa
     NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
       const empLista = (nextEmpleadosLista[negId] || [nextEmpleados[negId]]).map((e) => ({ ...e }));
       let cola = [...(nextColas[negId] || [])].map((c) => ({ ...c }));
       const postList = [...(nextPostCompra[negId] || [])];
+      // Registro de máquinas reclamadas en este tick para exclusividad y delegación
+      const occupiedMachinesThisTick = {};
 
       // 1. Spawning probabilístico de nuevos clientes (solo en locales con atención al público)
       const esTallerSinPublico =
@@ -1291,9 +1365,24 @@ export const useGameStore = create((set, get) => ({
           continue;
         }
 
+        // Limpiar bloqueo de baño si el ocupante ya no está en el local
+        if (nextBanoOcupado[negId]) {
+          const occId = nextBanoOcupado[negId].id;
+          const inEmp = empLista.some((e) => e.id === occId && e.humanRoutineActual?.codigo === 'RESTROOM_BREAK');
+          const inCli = cola.some((c) => c.id === occId && c.solicitoBano && !c.banoCompletado);
+          if (!inEmp && !inCli) {
+            nextBanoOcupado[negId] = null;
+          }
+        }
+
         // C) Asignar cliente esperando O trabajo interno de queue si el empleado está libre
-        if (emp.estado !== 'ATENDIENDO_CLIENTE' && emp.estado !== 'ATENDIENDO_QUEUE') {
-          const unassignedClient = cola.find((c) => !c.atendidoPorEmpId);
+        if (
+          emp.estado !== 'ATENDIENDO_CLIENTE' &&
+          emp.estado !== 'ATENDIENDO_QUEUE' &&
+          emp.estado !== 'RUTINA_HUMANA' &&
+          !emp.humanRoutineActual
+        ) {
+          const unassignedClient = cola.find((c) => !c.atendidoPorEmpId && (!c.solicitoBano || c.banoCompletado));
           if (unassignedClient) {
             unassignedClient.atendidoPorEmpId = emp.id;
             const receta = obtenerCoreografiaProducto(
@@ -1333,30 +1422,71 @@ export const useGameStore = create((set, get) => ({
             if (paso) {
               const wpCli = paso.waypointCliente || 'barra_cliente';
               const wpVen = paso.waypointVendedor || 'barra_vendedor';
-              const cliArrived = moveActorTowardsWaypoint(clienteActivo, wpCli, negId);
-              const venArrived = moveActorTowardsWaypoint(emp, wpVen, negId);
+              const slotOffset = emp.index === 0 ? -0.65 : (emp.index === 1 ? 0.65 : (emp.index - 0.5) * 1.3);
+              const cliOffset = (wpCli === 'barra_cliente' || wpCli === 'caja_tpv_cliente') ? [slotOffset, 0, 0] : [0, 0, 0];
+              const venOffset = (wpVen === 'barra_vendedor' || wpVen === 'caja_tpv_vendedor') ? [slotOffset, 0, 0] : [0, 0, 0];
 
-              clienteActivo.globoTexto = paso.dialogoCliente || null;
-              emp.textoAccion = paso.dialogoVendedor || paso.titulo;
-              emp.itemEnMano = paso.itemManoVendedor || null;
-              emp.pasoCodigoActual = paso.codigo || null;
-              emp.pasoDuracionActual = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
-              emp.animacionActual = paso.animacionVendedor || null;
-              emp.efectoVisualActual = paso.efectoVisual || null;
+              const reqEqKey = paso.equipoKey;
+              let isMachineBlocked = false;
+              let blockingEmpName = '';
+              let isSameProductType = false;
 
-              if (paso.equipoKey && nextEquipos[paso.equipoKey] && nextEquipos[paso.equipoKey].controlMode === 'AUTO') {
-                const eqTarget = nextEquipos[paso.equipoKey];
-                const wattsActivos = paso.estadoEquipo === 'OFF'
-                  ? 0
-                  : Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0));
-                nextEquipos[paso.equipoKey] = {
-                  ...eqTarget,
-                  estado: paso.estadoEquipo || 'WORK',
-                  wattsActuales: wattsActivos
-                };
+              if (reqEqKey && !reqEqKey.includes('tpv') && !reqEqKey.includes('ac')) {
+                if (occupiedMachinesThisTick[reqEqKey] && occupiedMachinesThisTick[reqEqKey].empId !== emp.id) {
+                  isMachineBlocked = true;
+                  blockingEmpName = occupiedMachinesThisTick[reqEqKey].empNombre;
+                  isSameProductType = occupiedMachinesThisTick[reqEqKey].productoId === (emp.recetaActual?.id || clienteActivo.productoDeseado?.id);
+                } else {
+                  occupiedMachinesThisTick[reqEqKey] = {
+                    empId: emp.id,
+                    empNombre: emp.nombre,
+                    productoId: emp.recetaActual?.id || clienteActivo.productoDeseado?.id
+                  };
+                }
               }
 
-              if ((cliArrived && venArrived) || state.timeScale >= 60) {
+              let cliArrived = false;
+              let venArrived = false;
+
+              if (isMachineBlocked) {
+                // Mutex: No pueden ocupar la misma máquina a la vez. Delegación o esperar turno en mostrador
+                if (isSameProductType) {
+                  emp.textoAccion = `🤝 Delegando ${paso.titulo} a ${blockingEmpName} (ya está en ${nextEquipos[reqEqKey]?.nombre || reqEqKey})`;
+                  emp.animacionActual = 'TALK_TO_CUSTOMER';
+                } else {
+                  emp.textoAccion = `⏳ Esperando turno en ${nextEquipos[reqEqKey]?.nombre || reqEqKey} (en uso por ${blockingEmpName})`;
+                  emp.animacionActual = 'WAIT_COOKING';
+                }
+                moveActorTowardsWaypoint(emp, 'barra_vendedor', negId, venOffset);
+                moveActorTowardsWaypoint(clienteActivo, wpCli, negId, cliOffset);
+                clienteActivo.globoTexto = paso.dialogoCliente || `Esperando mi ${clienteActivo.productoDeseado.nombre}...`;
+              } else {
+                cliArrived = moveActorTowardsWaypoint(clienteActivo, wpCli, negId, cliOffset);
+                venArrived = moveActorTowardsWaypoint(emp, wpVen, negId, venOffset);
+
+                clienteActivo.globoTexto = paso.dialogoCliente || null;
+                emp.textoAccion = paso.dialogoVendedor || paso.titulo;
+                emp.itemEnMano = paso.itemManoVendedor || null;
+                emp.pasoCodigoActual = paso.codigo || null;
+                emp.pasoDuracionActual = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
+                emp.animacionActual = paso.animacionVendedor || null;
+                emp.efectoVisualActual = paso.efectoVisual || null;
+
+                if (paso.equipoKey && nextEquipos[paso.equipoKey] && nextEquipos[paso.equipoKey].controlMode === 'AUTO') {
+                  const eqTarget = nextEquipos[paso.equipoKey];
+                  const wattsActivos = paso.estadoEquipo === 'OFF'
+                    ? 0
+                    : Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0));
+                  nextEquipos[paso.equipoKey] = {
+                    ...eqTarget,
+                    estado: paso.estadoEquipo || 'WORK',
+                    wattsActuales: wattsActivos,
+                    operacionActiva: paso.estadoEquipo !== 'OFF'
+                  };
+                }
+              }
+
+              if (!isMachineBlocked && ((cliArrived && venArrived) || state.timeScale >= 60)) {
                 emp.pasoElapsedSec += simDeltaSec;
                 const durRequerida = Math.max(1.0, parseFloat(paso.duracionSegundos) || 4.0);
                 if (emp.pasoElapsedSec >= durRequerida) {
@@ -1510,22 +1640,44 @@ export const useGameStore = create((set, get) => ({
           const pasos = emp.recetaActual.pasos || [];
           const paso = pasos[emp.pasoActualIndex] || pasos[0];
           if (paso) {
-            const venArrived = moveActorTowardsWaypoint(emp, paso.waypointVendedor || 'barra_vendedor', negId);
-            emp.textoAccion = `[Queue] ${paso.dialogoVendedor || paso.titulo}`;
-            emp.itemEnMano = paso.itemManoVendedor || null;
-            emp.pasoCodigoActual = paso.codigo || null;
-            emp.animacionActual = paso.animacionVendedor || null;
-
-            if (paso.equipoKey && nextEquipos[paso.equipoKey] && nextEquipos[paso.equipoKey].controlMode === 'AUTO') {
-              const eqTarget = nextEquipos[paso.equipoKey];
-              nextEquipos[paso.equipoKey] = {
-                ...eqTarget,
-                estado: paso.estadoEquipo || 'WORK',
-                wattsActuales: Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0))
-              };
+            const reqEqKey = paso.equipoKey;
+            let isMachineBlocked = false;
+            let blockingEmpName = '';
+            if (reqEqKey && !reqEqKey.includes('tpv') && !reqEqKey.includes('ac')) {
+              if (occupiedMachinesThisTick[reqEqKey] && occupiedMachinesThisTick[reqEqKey].empId !== emp.id) {
+                isMachineBlocked = true;
+                blockingEmpName = occupiedMachinesThisTick[reqEqKey].empNombre;
+              } else {
+                occupiedMachinesThisTick[reqEqKey] = {
+                  empId: emp.id,
+                  empNombre: emp.nombre,
+                  productoId: emp.recetaActual?.id
+                };
+              }
             }
 
-            if (venArrived || state.timeScale >= 60) {
+            const venArrived = moveActorTowardsWaypoint(emp, paso.waypointVendedor || 'barra_vendedor', negId);
+
+            if (isMachineBlocked) {
+              emp.textoAccion = `⏳ Esperando turno en ${reqEqKey.replace(/^[a-z]+_/, '')} (ocupado por ${blockingEmpName})...`;
+              emp.animacionActual = 'WAIT_COOKING';
+            } else {
+              emp.textoAccion = `[Queue] ${paso.dialogoVendedor || paso.titulo}`;
+              emp.itemEnMano = paso.itemManoVendedor || null;
+              emp.pasoCodigoActual = paso.codigo || null;
+              emp.animacionActual = paso.animacionVendedor || null;
+
+              if (paso.equipoKey && nextEquipos[paso.equipoKey] && nextEquipos[paso.equipoKey].controlMode === 'AUTO') {
+                const eqTarget = nextEquipos[paso.equipoKey];
+                nextEquipos[paso.equipoKey] = {
+                  ...eqTarget,
+                  estado: paso.estadoEquipo || 'WORK',
+                  wattsActuales: Math.round((paso.wattsNominales || eqTarget.wattsNominal) * (paso.factorPotencia ?? 1.0))
+                };
+              }
+            }
+
+            if (!isMachineBlocked && (venArrived || state.timeScale >= 60)) {
               emp.pasoElapsedSec += simDeltaSec;
               const dur = Math.max(1.0, parseFloat(paso.duracionSegundos) || 12.0);
               if (emp.pasoElapsedSec >= dur) {
@@ -1580,7 +1732,43 @@ export const useGameStore = create((set, get) => ({
             emp.nextRestroomTriggerSec = emp.workSecondsToday + 3600 + Math.random() * 2400;
           }
 
-          if (emp.humanRoutineActual) {
+          if (emp.humanRoutineActual && emp.humanRoutineActual.codigo === 'RESTROOM_BREAK') {
+            const hr = emp.humanRoutineActual;
+            emp.estado = 'RUTINA_HUMANA';
+
+            const banoActual = nextBanoOcupado[negId];
+            if (!banoActual || banoActual.id === emp.id) {
+              // Baño reservado para este empleado
+              nextBanoOcupado[negId] = { id: emp.id, name: emp.nombre, type: 'empleado' };
+              emp.isWaitingRestroom = false;
+              const arrivedDoor = moveActorTowardsWaypoint(emp, 'bano_empleado', negId);
+              if (arrivedDoor) {
+                emp.isInsideRestroom = true; // Entra por la puerta y desaparece de la vista del local
+                emp.textoAccion = '🚻 En el baño...';
+                emp.humanRoutineElapsedSec += simDeltaSec;
+                if (emp.humanRoutineElapsedSec >= (hr.duracion || 35)) {
+                  // Termina y sale del baño
+                  emp.isInsideRestroom = false;
+                  nextBanoOcupado[negId] = null;
+                  emp.humanRoutineActual = null;
+                  emp.humanRoutineElapsedSec = 0;
+                  emp.estado = 'IDLE_TASK';
+                  emp.animacionActual = null;
+                  pushLog(negId, 'info', `🚻 ${emp.nombre} salió del baño y regresó a sus labores.`);
+                }
+              } else {
+                emp.textoAccion = '🚻 Dirigiéndose al baño...';
+                emp.animacionActual = 'WALK';
+              }
+            } else {
+              // Baño ocupado por otra persona (cliente u otro empleado): espera afuera del baño
+              emp.isInsideRestroom = false;
+              emp.isWaitingRestroom = true;
+              moveActorTowardsWaypoint(emp, 'espera_bano', negId);
+              emp.textoAccion = `🚻 Esperando turno del baño (ocupado por ${banoActual.name})...`;
+              emp.animacionActual = 'WAIT_COOKING';
+            }
+          } else if (emp.humanRoutineActual) {
             const hr = emp.humanRoutineActual;
             emp.estado = 'RUTINA_HUMANA';
             emp.textoAccion = hr.texto;
@@ -1623,15 +1811,46 @@ export const useGameStore = create((set, get) => ({
         empLista[eIdx] = emp;
       }
 
-      // 4. Clientes restantes en fila que aún esperan turno
+      // 4. Clientes restantes en fila que aún esperan turno o usan el baño
       let waitSlot = 0;
       for (let cIdx = 0; cIdx < cola.length; cIdx++) {
         const cli = cola[cIdx];
         if (!cli.atendidoPorEmpId) {
-          const wpEspera = waitSlot === 0 ? 'puerta_entrada' : 'acera_exterior';
-          moveActorTowardsWaypoint(cli, wpEspera, negId);
-          cli.globoTexto = `En fila (#${waitSlot + 1}) para ${cli.productoDeseado.nombre}`;
-          waitSlot++;
+          if (cli.solicitoBano && !cli.banoCompletado) {
+            // El cliente solicitó pasar al baño (lavarse las manos, del 1 o del 2)
+            const banoActual = nextBanoOcupado[negId];
+            if (!banoActual || banoActual.id === cli.id) {
+              nextBanoOcupado[negId] = { id: cli.id, name: cli.nombre, type: 'cliente', need: cli.necesidadBano };
+              cli.isWaitingRestroom = false;
+              const arrivedDoor = moveActorTowardsWaypoint(cli, 'bano_empleado', negId);
+              if (arrivedDoor) {
+                cli.isInsideRestroom = true; // Entra y desaparece de la vista del local
+                cli.globoTexto = null;
+                cli.tiempoBanoRestanteSeg = (cli.tiempoBanoRestanteSeg || 15) - simDeltaSec;
+                if (cli.tiempoBanoRestanteSeg <= 0) {
+                  cli.isInsideRestroom = false; // Reaparece
+                  cli.banoCompletado = true;
+                  nextBanoOcupado[negId] = null;
+                  const txtNeed = cli.necesidadBano === 'manos' ? 'lavarse las manos' : (cli.necesidadBano === 'del_1' ? 'hacer del 1' : 'hacer del 2');
+                  pushLog(negId, 'client', `🚻 ${cli.nombre} terminó de ${txtNeed} en el baño y pasa a formarse.`);
+                }
+              } else {
+                const txtNeed = cli.necesidadBano === 'manos' ? 'lavarme las manos' : (cli.necesidadBano === 'del_1' ? 'hacer del 1' : 'hacer del 2');
+                cli.globoTexto = `¿Puedo pasar al baño a ${txtNeed}?`;
+              }
+            } else {
+              cli.isInsideRestroom = false;
+              cli.isWaitingRestroom = true;
+              moveActorTowardsWaypoint(cli, 'espera_bano', negId);
+              cli.globoTexto = `🚻 Esperando turno del baño (ocupado por ${banoActual.name})...`;
+            }
+          } else {
+            // Cliente normal esperando en fila: se acomoda ordenadamente detrás del mostrador (separado por ~1.1m cada uno)
+            const qOffset = [(waitSlot % 2 === 0 ? 0.08 : -0.08), 0, 1.25 + waitSlot * 1.1];
+            moveActorTowardsWaypoint(cli, 'barra_cliente', negId, qOffset);
+            cli.globoTexto = `En fila (#${waitSlot + 1}) para ${cli.productoDeseado.nombre}`;
+            waitSlot++;
+          }
         }
       }
 
@@ -1885,6 +2104,7 @@ export const useGameStore = create((set, get) => ({
       cotizacionesPendientesGerente: nextCotizaciones,
       clientesColaPorNegocio: nextColas,
       clientesPostCompraPorNegocio: nextPostCompra,
+      banoOcupadoPorNegocio: nextBanoOcupado,
       spawnAccumulators: nextSpawnAcc,
       statsPorNegocio: nextStats,
       inventarioPorNegocio: nextInventario,

@@ -222,6 +222,26 @@ export function crearEntidadCliente(negocioId, condiciones, productoForzadoId = 
   // En Imperia Uniformes, probabilidad de compra tras probarse la prenda (82% compra, 18% solo se prueba y no compra)
   const compraraTrasPrueba = negocioId === 'imperia_uniformes' ? (Math.random() < 0.84) : true;
 
+  // Necesidades fisiológicas y de higiene de clientes al llegar al establecimiento
+  // Tipos con diferente duración: Lavarse las manos (~10s), Del 1 (~20s), Del 2 (~45s)
+  const randBano = Math.random();
+  const tieneNecesidadBano = randBano < 0.22; // ~22% de probabilidad al visitar
+  let necesidadBano = null;
+  let tiempoBanoRestanteSeg = 0;
+  if (tieneNecesidadBano) {
+    const randTipo = Math.random();
+    if (randTipo < 0.48) {
+      necesidadBano = 'manos';
+      tiempoBanoRestanteSeg = 10;
+    } else if (randTipo < 0.82) {
+      necesidadBano = 'del_1';
+      tiempoBanoRestanteSeg = 20;
+    } else {
+      necesidadBano = 'del_2';
+      tiempoBanoRestanteSeg = 45;
+    }
+  }
+
   return {
     id: `cli_${negocioId}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
     negocioId,
@@ -239,6 +259,13 @@ export function crearEntidadCliente(negocioId, condiciones, productoForzadoId = 
     targetWaypoint: 'barra_cliente',
     rutaActual: [],
     globoTexto: null,
-    tieneProductoEnMano: false
+    tieneProductoEnMano: false,
+    // Estado y necesidades de baño
+    solicitoBano: tieneNecesidadBano,
+    necesidadBano,
+    tiempoBanoRestanteSeg,
+    banoCompletado: !tieneNecesidadBano,
+    isInsideRestroom: false,
+    isWaitingRestroom: false
   };
 }

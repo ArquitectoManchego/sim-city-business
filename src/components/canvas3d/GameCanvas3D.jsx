@@ -1233,7 +1233,7 @@ export default function GameCanvas3D() {
         empLista.forEach((emp) => {
           const mesh = actorGroupsRef.current.employees[emp.id];
           if (mesh) {
-            mesh.visible = alpha > 0.001;
+            mesh.visible = alpha > 0.001 && !emp.isInsideRestroom;
             if (mesh.visible) {
               mesh.traverse((obj) => {
                 if (obj.isMesh && obj.material) {
@@ -1264,7 +1264,7 @@ export default function GameCanvas3D() {
         clients.forEach((c) => {
           const mesh = actorGroupsRef.current.customers[c.id];
           if (mesh) {
-            mesh.visible = alpha > 0.001;
+            mesh.visible = alpha > 0.001 && !c.isInsideRestroom;
             if (mesh.visible) {
               mesh.traverse((obj) => {
                 if (obj.isMesh && obj.material) {
@@ -1378,23 +1378,25 @@ export default function GameCanvas3D() {
             }
           });
 
-          // Globo de diálogo del cliente activo en este negocio
-          const activeCli = freshGame.clientesColaPorNegocio[negId]?.[0];
-          const cliMesh = activeCli ? actorGroupsRef.current.customers[activeCli.id] : null;
-          if (activeCli && cliMesh && cliMesh.visible && activeCli.globoTexto) {
-            const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.95, cliMesh.position.z));
-            if (cliScreen) {
-              nextLabels.push({
-                id: `lbl_cli_${activeCli.id}`,
-                x: cliScreen.x,
-                y: cliScreen.y,
-                badge: activeCli.nombre,
-                color: '#38bdf8',
-                text: activeCli.globoTexto,
-                isClient: true
-              });
+          // Globos de diálogo de los clientes en cola o esperando baño en este negocio
+          const qClients = freshGame.clientesColaPorNegocio[negId] || [];
+          qClients.forEach((cli) => {
+            const cliMesh = actorGroupsRef.current.customers[cli.id];
+            if (cliMesh && cliMesh.visible && cli.globoTexto) {
+              const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.95, cliMesh.position.z));
+              if (cliScreen) {
+                nextLabels.push({
+                  id: `lbl_cli_${cli.id}`,
+                  x: cliScreen.x,
+                  y: cliScreen.y,
+                  badge: cli.nombre,
+                  color: cli.isWaitingRestroom ? '#f59e0b' : '#38bdf8',
+                  text: cli.globoTexto,
+                  isClient: true
+                });
+              }
             }
-          }
+          });
         });
 
         // Etiqueta flotante del Gerente General (solo si está en el local visible)
