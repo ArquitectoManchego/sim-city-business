@@ -2,11 +2,11 @@
  * Panel de Materia Prima, Costos de Insumos, Stock Actual y Gasto por Producto (BOM).
  */
 
-import React, { useState } from 'react';
-import { X, Package, RefreshCw, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { X, Package, RefreshCw, AlertTriangle, CheckCircle2, Search } from 'lucide-react';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { NEGOCIOS_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
-import { PRODUCTOS_OPERATIVOS_EXTENDIDOS } from '../../shared/catalogoProductosInsumos.js';
+import { PRODUCTOS_OPERATIVOS_EXTENDIDOS, IMPERIARTE_CATEGORIES } from '../../shared/catalogoProductosInsumos.js';
 
 export default function InventoryStockDrawer() {
   const isOpen = useGameStore((s) => s.isInventoryDrawerOpen);
@@ -20,11 +20,28 @@ export default function InventoryStockDrawer() {
   const [selectedNegocio, setSelectedNegocio] = useState(
     NEGOCIOS_ZONES_3D[focusedNegocioId] ? focusedNegocioId : 'hawaiian_paradise'
   );
-
-  if (!isOpen) return null;
+  const [searchCatalog, setSearchCatalog] = useState('');
+  const [imperiCategory, setImperiCategory] = useState('Todas');
 
   const insumos = inventarioPorNegocio[selectedNegocio] || [];
   const productos = PRODUCTOS_OPERATIVOS_EXTENDIDOS[selectedNegocio] || [];
+
+  const productosFiltrados = useMemo(() => {
+    if (selectedNegocio !== 'papeleria_imperiarte') return productos;
+    const q = searchCatalog.trim().toLowerCase();
+    return productos.filter((p) => {
+      if (imperiCategory !== 'Todas' && p.categoria !== imperiCategory) return false;
+      if (!q) return true;
+      return (
+        (p.nombre || '').toLowerCase().includes(q) ||
+        (p.sku || '').toLowerCase().includes(q) ||
+        (p.categoria || '').toLowerCase().includes(q) ||
+        (p.linea || '').toLowerCase().includes(q)
+      );
+    });
+  }, [productos, selectedNegocio, searchCatalog, imperiCategory]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4">
@@ -151,12 +168,46 @@ export default function InventoryStockDrawer() {
 
           {/* Tabla de Productos: Qué se prepara, qué se revende, qué se fabrica y qué materia prima consume */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2.5">
-              Catálogo de Productos, Clasificación Operativa y Gasto de Materia Prima por Venta
-            </h3>
-            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                Catálogo de Productos, Clasificación Operativa y Gasto de Materia Prima por Venta
+                {selectedNegocio === 'papeleria_imperiarte' && (
+                  <span className="ml-2 text-amber-400">({productosFiltrados.length} de {productos.length} artículos ImperiArte)</span>
+                )}
+              </h3>
+              {selectedNegocio === 'papeleria_imperiarte' && (
+                <div className="relative w-64">
+                  <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    value={searchCatalog}
+                    onChange={(e) => setSearchCatalog(e.target.value)}
+                    placeholder="Buscar SKU, papel, cartón..."
+                    className="w-full bg-slate-950 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              )}
+            </div>
+            {selectedNegocio === 'papeleria_imperiarte' && (
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {['Todas', ...IMPERIARTE_CATEGORIES].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setImperiCategory(cat)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-semibold transition-colors ${
+                      imperiCategory === cat
+                        ? 'bg-amber-500 text-slate-950'
+                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="bg-slate-950 border border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto">
               <table className="w-full text-left border-collapse text-xs">
-                <thead>
+                <thead className="sticky top-0 z-10">
                   <tr className="bg-slate-900 text-slate-400 border-b border-slate-800">
                     <th className="py-2.5 px-3">Producto</th>
                     <th className="py-2.5 px-3">Modalidad</th>
@@ -166,9 +217,22 @@ export default function InventoryStockDrawer() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800/70">
-                  {productos.map((p) => (
+                  {productosFiltrados.map((p) => (
                     <tr key={p.id} className="hover:bg-slate-900/50">
-                      <td className="py-2.5 px-3 font-bold text-white">{p.nombre}</td>
+                      <td className="py-2.5 px-3 font-bold text-white">
+                        <div>{p.nombre}</div>
+                        {(p.sku || p.categoria) && (
+                          <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[10px] font-normal text-slate-400">
+                            {p.sku && <span className="font-mono text-amber-300/90">SKU {p.sku}</span>}
+                            {p.categoria && <span>• {p.categoria}</span>}
+                            {p.isHorizontalBoard && (
+                              <span className="px-1.5 py-0.2 rounded bg-amber-900/50 text-amber-300 border border-amber-700/40">
+                                Repisa Horizontal
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
                       <td className="py-2.5 px-3">
                         <span
                           className={`px-2 py-0.5 rounded text-[10px] font-bold ${

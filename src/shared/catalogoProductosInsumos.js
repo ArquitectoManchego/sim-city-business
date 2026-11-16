@@ -7,8 +7,9 @@
 import { CATALOGO_PRECIOS_COSTOS } from './preciosYCostosProductos.js';
 import { PROCESOS_POR_NEGOCIO } from './procesosNegocios.js';
 import { NEGOCIOS_CONFIG } from './equiposNegocios.js';
+import { IMPERIARTE_CATALOG_DB, IMPERIARTE_CATEGORIES } from './imperiarteCatalogDB.js';
 
-export { CATALOGO_PRECIOS_COSTOS, PROCESOS_POR_NEGOCIO, NEGOCIOS_CONFIG };
+export { CATALOGO_PRECIOS_COSTOS, PROCESOS_POR_NEGOCIO, NEGOCIOS_CONFIG, IMPERIARTE_CATALOG_DB, IMPERIARTE_CATEGORIES };
 
 // ============================================================================
 // 1. INVENTARIO DE MATERIA PRIMA E INSUMOS POR UNIDAD DE NEGOCIO
@@ -244,16 +245,55 @@ export const MATERIAS_PRIMAS_POR_NEGOCIO = {
     },
     {
       id: 'mat_pliego_bateria_marquilla',
-      nombre: 'Pliegos Cartón Batería / Marquilla / Foamboard (Reventa)',
+      nombre: 'Pliegos Cartón Batería / Ilustración / Gris / Fome-Cor (Repisas Horizontales)',
       unidad: 'pliego',
-      costoUnitario: 24.00,
-      stockActual: 140,
-      stockMaximo: 250,
-      puntoReorden: 30,
-      loteRecompra: 100,
-      estacionKey: 'raw_rack_pliegos',
+      costoUnitario: 38.00,
+      stockActual: 240,
+      stockMaximo: 400,
+      puntoReorden: 40,
+      loteRecompra: 150,
+      estacionKey: 'rack_horizontal_cartones',
       colorHex: '#cbd5e1',
       forma3D: 'board_rack'
+    },
+    {
+      id: 'mat_papeles_arte_fabriano',
+      nombre: 'Pliegos Algodón Fabriano / Favini / Blocks Pinto (Repisas Horizontales)',
+      unidad: 'pliego',
+      costoUnitario: 42.00,
+      stockActual: 200,
+      stockMaximo: 350,
+      puntoReorden: 35,
+      loteRecompra: 120,
+      estacionKey: 'rack_horizontal_papeles',
+      colorHex: '#fef3c7',
+      forma3D: 'board_rack'
+    },
+    {
+      id: 'mat_bastidores_caballetes',
+      nombre: 'Bastidores Pinto (Academia/Galería/Profesional) y Caballetes',
+      unidad: 'pza',
+      costoUnitario: 95.00,
+      stockActual: 110,
+      stockMaximo: 200,
+      puntoReorden: 20,
+      loteRecompra: 80,
+      estacionKey: 'rack_bastidores_caballetes',
+      colorHex: '#f5f5f4',
+      forma3D: 'garment_rack'
+    },
+    {
+      id: 'mat_pinturas_marcadores_arte',
+      nombre: 'Pinturas Pinto/Pebeo, Marcadores Chartpak/Staedtler y Pinceles',
+      unidad: 'pza',
+      costoUnitario: 65.00,
+      stockActual: 260,
+      stockMaximo: 400,
+      puntoReorden: 45,
+      loteRecompra: 150,
+      estacionKey: 'rack_pinturas_medios',
+      colorHex: '#ec4899',
+      forma3D: 'box_stack'
     }
   ],
 
@@ -614,7 +654,7 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       tipoOperacion: 'PREPARADO_AL_MOMENTO',
       precioVenta: 30.00,
       costoMateriales: 6.75,
-      pesoEnMix: 45,
+      pesoEnMix: 140,
       equiposInvolucrados: ['pap_tpv', 'pap_docucolor'],
       bom: [
         { insumoId: 'mat_papel_bond_carta', cantidad: 15 },
@@ -628,26 +668,40 @@ export const PRODUCTOS_OPERATIVOS_EXTENDIDOS = {
       tipoOperacion: 'PREPARADO_AL_MOMENTO',
       precioVenta: 64.00,
       costoMateriales: 17.60,
-      pesoEnMix: 30,
+      pesoEnMix: 110,
       equiposInvolucrados: ['pap_tpv', 'pap_docucolor'],
       bom: [
         { insumoId: 'mat_papel_bond_carta', cantidad: 8 },
         { insumoId: 'mat_toner_cmyk', cantidad: 3 }
       ]
     },
-    {
-      id: 'pap_bateria_2mm',
-      procesoId: 'pap_venta_mostrador',
-      nombre: 'Pliegos Cartón Batería Pinto / Marquilla (Reventa)',
-      tipoOperacion: 'COMPRA_Y_REVENTA',
-      precioVenta: 65.00,
-      costoMateriales: 28.00,
-      pesoEnMix: 25,
-      equiposInvolucrados: ['pap_tpv'],
-      bom: [
-        { insumoId: 'mat_pliego_bateria_marquilla', cantidad: 1 }
-      ]
-    }
+    ...IMPERIARTE_CATALOG_DB.map((item) => {
+      const insumoId =
+        item.rackKey === 'rack_horizontal_cartones'
+          ? 'mat_pliego_bateria_marquilla'
+          : item.rackKey === 'rack_horizontal_papeles'
+            ? 'mat_papeles_arte_fabriano'
+            : item.rackKey === 'rack_bastidores_caballetes'
+              ? 'mat_bastidores_caballetes'
+              : 'mat_pinturas_marcadores_arte';
+      return {
+        id: item.id,
+        sku: item.sku,
+        marca: item.marca,
+        categoria: item.categoria,
+        rackKey: item.rackKey,
+        handItem: item.handItem,
+        isHorizontalBoard: item.isHorizontalBoard,
+        procesoId: item.id,
+        nombre: item.nombre,
+        tipoOperacion: 'COMPRA_Y_REVENTA',
+        precioVenta: item.precio,
+        costoMateriales: item.costo,
+        pesoEnMix: item.isHorizontalBoard ? 3 : 1,
+        equiposInvolucrados: ['pap_tpv'],
+        bom: [{ insumoId, cantidad: 1 }]
+      };
+    })
   ],
 
   bordados_veracruz: [

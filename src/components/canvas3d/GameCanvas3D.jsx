@@ -23,7 +23,8 @@ import {
   createApplianceModel3D,
   updateApplianceVisualState,
   updateHandItemVisual,
-  resolveDualHandTools
+  resolveDualHandTools,
+  buildPapeleriaImperiArteFurniture3D
 } from './EquipmentModels3D.js';
 import {
   preloadSims2Assets,
@@ -578,6 +579,7 @@ export default function GameCanvas3D() {
 
       if (negId === 'papeleria_imperiarte') {
         spawnMachine('pap_docucolor', [wps.eq_pap_docucolor[0], 0, wps.eq_pap_docucolor[2] - 0.75]);
+        localGroup.add(buildPapeleriaImperiArteFurniture3D());
       }
 
       if (negId === 'bordados_veracruz') {

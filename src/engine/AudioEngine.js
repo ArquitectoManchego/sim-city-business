@@ -587,7 +587,7 @@ class SimAudioEngine {
     this.liveAudioState.focusedNegocioId = focusedNegocioId;
 
     // 1. Detectar entrada de nuevos clientes en locales públicos -> Campanita de puerta
-    ['hawaiian_paradise', 'imperia_uniformes', 'papeleria_alacio'].forEach((negId) => {
+    ['hawaiian_paradise', 'imperia_uniformes', 'papeleria_imperiarte'].forEach((negId) => {
       const len = (gameState.clientesColaPorNegocio?.[negId] || []).length;
       const prev = this.prevClientCountByNeg[negId] ?? len;
       if (len > prev && negId === focusedNegocioId) {

@@ -1698,6 +1698,25 @@ export function animateSims2Actor(
     rHand = [-0.05 + sw * 0.5, 1.18, 0.25];
     lPole = [0.28, 1.08, -0.08];
     rPole = [-0.28, 1.22, -0.08];
+  } else if (animType === 'PULL_HORIZONTAL_BOARD') {
+    // Repisas horizontales de madera ImperiArte: desliza el cartón grande hacia afuera horizontalmente
+    const pullZ = 0.36 - (stepProgress > 0 ? stepProgress : (Math.sin(nowSec * 1.4) + 1) * 0.5) * 0.14;
+    spineRx = 0.08;
+    headRx = 0.06;
+    lHand = [0.23, 1.12, pullZ];
+    rHand = [-0.23, 1.12, pullZ];
+    lPole = [0.34, 1.14, -0.06];
+    rPole = [-0.34, 1.14, -0.06];
+    lHandMode = 'upright';
+    rHandMode = 'upright';
+  } else if (animType === 'CARRY_HORIZONTAL_BOARD') {
+    // Sostiene el cartón grande plano y nivelado con ambas manos separadas
+    lHand = [0.24, 1.04, 0.28];
+    rHand = [-0.24, 1.04, 0.28];
+    lPole = [0.34, 1.10, -0.10];
+    rPole = [-0.34, 1.10, -0.10];
+    lHandMode = 'upright';
+    rHandMode = 'upright';
   } else if (animType === 'CARRY_BOWL' || animType === 'CARRY_PLATE') {
     // Cargar charola/plato/prenda frente al cuerpo con antebrazos nivelados
     const stepBob = Math.sin(nowSec * 4.0) * 0.01;

@@ -24,7 +24,10 @@ export const DEFAULT_COLLISION_BLOCKS_POR_NEGOCIO = {
   ],
   papeleria_imperiarte: [
     { id: 'col_pap_mostrador', label: 'Mostrador Papelería & TPV', tagType: 'COLLISION_BLOCK', x: 0.2, z: 0.0, w: 4.2, d: 0.75, h: 1.0, color: '#2563eb' },
-    { id: 'col_pap_docucolor_base', label: 'Isla Xerox DocuColor', tagType: 'COLLISION_BLOCK', x: -3.2, z: -3.8, w: 2.2, d: 1.0, h: 1.15, color: '#1d4ed8' }
+    { id: 'col_pap_docucolor_base', label: 'Isla Xerox DocuColor', tagType: 'COLLISION_BLOCK', x: -3.2, z: -3.8, w: 2.2, d: 1.0, h: 1.15, color: '#1d4ed8' },
+    { id: 'col_pap_rack_cartones', label: 'Mueble Horizontal Cartones (6 Niveles)', tagType: 'COLLISION_BLOCK', x: 3.2, z: -3.65, w: 2.3, d: 1.15, h: 1.75, color: '#b45309' },
+    { id: 'col_pap_rack_papeles', label: 'Mueble Horizontal Papeles Finos Fabriano/Favini', tagType: 'COLLISION_BLOCK', x: 0.4, z: -3.65, w: 2.3, d: 1.15, h: 1.75, color: '#d97706' },
+    { id: 'col_pap_bastidores', label: 'Rack Bastidores, Lonetas y Caballetes', tagType: 'COLLISION_BLOCK', x: -4.8, z: -0.8, w: 0.7, d: 2.0, h: 1.65, color: '#92400e' }
   ],
   bordados_veracruz: [
     { id: 'col_bv_mesa_recepcion', label: 'Mesa de Recepción y Bastidores', tagType: 'COLLISION_BLOCK', x: 0.0, z: 0.6, w: 3.8, d: 0.75, h: 0.95, color: '#e11d48' },

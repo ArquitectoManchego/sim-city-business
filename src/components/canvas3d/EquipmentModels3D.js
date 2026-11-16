@@ -1306,7 +1306,114 @@ export function updateHandItemVisual(handItemGroup, itemType) {
     addPart(handItemGroup, new THREE.BoxGeometry(0.26, 0.34, 0.04), matStandard(0x0ea5e9, 0.7, 0.05), [0, -0.14, 0.02]);
   } else if (itemType === 'product_bag') {
     addPart(handItemGroup, new THREE.BoxGeometry(0.20, 0.24, 0.14), matStandard(0xf59e0b, 0.6, 0.0), [0, -0.02, 0]);
+  } else if (itemType === 'large_cardboard_sheet') {
+    // Pliego grande de cartón batería / ilustración / Fabriano sostenido horizontalmente
+    addPart(handItemGroup, new THREE.BoxGeometry(0.62, 0.014, 0.46), matStandard(0xfef3c7, 0.78, 0.02), [0.16, 0.01, 0.14]);
+    addPart(handItemGroup, new THREE.BoxGeometry(0.60, 0.008, 0.44), matStandard(0xe2e8f0, 0.8, 0.02), [0.16, 0.022, 0.14]);
+  } else if (itemType === 'canvas_bastidor') {
+    addPart(handItemGroup, new THREE.BoxGeometry(0.36, 0.44, 0.03), matStandard(0xf8fafc, 0.85, 0.02), [0, 0.08, 0.04]);
+    addPart(handItemGroup, new THREE.BoxGeometry(0.38, 0.02, 0.035), matStandard(0xb45309, 0.65, 0.05), [0, -0.14, 0.04]);
+  } else if (itemType === 'art_supply_box') {
+    addPart(handItemGroup, new THREE.BoxGeometry(0.22, 0.06, 0.16), matStandard(0x0284c7, 0.5, 0.1), [0, 0.02, 0.04]);
+    addPart(handItemGroup, new THREE.BoxGeometry(0.18, 0.02, 0.12), matStandard(0xf59e0b, 0.4, 0.1), [0, 0.06, 0.04]);
   }
+}
+
+/**
+ * Construye los muebles grandes de repisas horizontales de madera para cartones/papeles
+ * y exhibidores de bellas artes de Papelería ImperiArte.
+ */
+export function buildPapeleriaImperiArteFurniture3D() {
+  const group = new THREE.Group();
+  const woodMat = matStandard(0x92400e, 0.68, 0.05);
+  const woodLightMat = matStandard(0xb45309, 0.62, 0.05);
+  const darkWoodMat = matStandard(0x78350f, 0.72, 0.05);
+
+  // Helper: Mueble Grande de Repisas Horizontales de Madera (6 niveles para cartones grandes)
+  const buildHorizontalBoardRack = (posX, posZ, shelfColors) => {
+    const rack = new THREE.Group();
+    rack.position.set(posX, 0, posZ);
+    const w = 2.24;
+    const d = 1.12;
+    const h = 1.72;
+
+    // 4 postes verticales esquineros + 2 postes centrales de carga
+    [
+      [-w / 2 + 0.04, -d / 2 + 0.04],
+      [w / 2 - 0.04, -d / 2 + 0.04],
+      [-w / 2 + 0.04, d / 2 - 0.04],
+      [w / 2 - 0.04, d / 2 - 0.04],
+      [0, -d / 2 + 0.04]
+    ].forEach(([px, pz]) => {
+      addPart(rack, new THREE.BoxGeometry(0.06, h, 0.06), darkWoodMat, [px, h / 2, pz]);
+    });
+
+    // Respaldo y laterales ligeros de madera
+    addPart(rack, new THREE.BoxGeometry(w, h, 0.03), woodMat, [0, h / 2, -d / 2 + 0.015]);
+    addPart(rack, new THREE.BoxGeometry(0.03, h, d), woodMat, [-w / 2 + 0.015, h / 2, 0]);
+    addPart(rack, new THREE.BoxGeometry(0.03, h, d), woodMat, [w / 2 - 0.015, h / 2, 0]);
+
+    // 6 Repisas horizontales anchas + pilas horizontales de cartones/pliegos en cada nivel
+    const levels = [0.16, 0.44, 0.72, 1.00, 1.28, 1.56];
+    levels.forEach((ly, idx) => {
+      // Tabla horizontal de madera
+      addPart(rack, new THREE.BoxGeometry(w - 0.04, 0.035, d - 0.02), woodLightMat, [0, ly, 0]);
+
+      // Pila de cartones / pliegos almacenados de manera horizontal (2 pilas lado a lado por nivel)
+      const colHex = shelfColors[idx % shelfColors.length];
+      const sheetMat = matStandard(colHex, 0.78, 0.02);
+      addPart(rack, new THREE.BoxGeometry(0.98, 0.09, 0.94), sheetMat, [-0.54, ly + 0.062, 0.02]);
+      addPart(rack, new THREE.BoxGeometry(0.98, 0.075, 0.94), sheetMat, [0.54, ly + 0.055, 0.02]);
+    });
+
+    // Tapa superior de madera
+    addPart(rack, new THREE.BoxGeometry(w + 0.04, 0.04, d + 0.04), darkWoodMat, [0, h, 0]);
+    return rack;
+  };
+
+  // Mueble Horizontal 1: Cartón Batería, Ilustración, Gris, Fibra Sólida BKB, Fome-Cor, Cartón con Tela
+  group.add(
+    buildHorizontalBoardRack(3.2, -3.65, [0x94a3b8, 0xfef3c7, 0xf8fafc, 0xe2e8f0, 0x334155, 0xf1f5f9])
+  );
+
+  // Mueble Horizontal 2: Pliegos de Algodón Fabriano, Favini y Blocks Pinto
+  group.add(
+    buildHorizontalBoardRack(0.4, -3.65, [0xfef9c3, 0xfda4af, 0x93c5fd, 0x86efac, 0xfde68a, 0xf8fafc])
+  );
+
+  // Rack de Bastidores, Lonetas y Caballetes (lateral izquierdo)
+  const bastidorRack = new THREE.Group();
+  bastidorRack.position.set(-4.8, 0, -0.8);
+  addPart(bastidorRack, new THREE.BoxGeometry(0.65, 1.65, 2.0), darkWoodMat, [0, 0.825, 0]);
+  for (let i = 0; i < 6; i++) {
+    addPart(
+      bastidorRack,
+      new THREE.BoxGeometry(0.05, 0.88, 0.65),
+      matStandard(0xf8fafc, 0.82, 0.02),
+      [0.24 - (i % 2) * 0.08, 0.68, -0.65 + i * 0.26]
+    );
+  }
+  group.add(bastidorRack);
+
+  // Exhibidor de Pinturas, Acuarelas, Óleos y Marcadores Chartpak/Staedtler
+  const artRack = new THREE.Group();
+  artRack.position.set(-2.2, 0, -3.7);
+  addPart(artRack, new THREE.BoxGeometry(1.5, 1.6, 0.48), woodMat, [0, 0.8, 0]);
+  [0.42, 0.78, 1.14, 1.46].forEach((ay, rIdx) => {
+    addPart(artRack, new THREE.BoxGeometry(1.42, 0.03, 0.44), woodLightMat, [0, ay, 0.02]);
+    const palette = [0xef4444, 0xf59e0b, 0x10b981, 0x3b82f6, 0xa855f7, 0xec4899];
+    for (let c = 0; c < 6; c++) {
+      addPart(
+        artRack,
+        new THREE.BoxGeometry(0.16, 0.14, 0.16),
+        matStandard(palette[(c + rIdx) % palette.length], 0.45, 0.1),
+        [-0.55 + c * 0.22, ay + 0.085, 0.05]
+      );
+    }
+  });
+  group.add(artRack);
+
+  return group;
 }
 
 /**
@@ -1333,4 +1440,5 @@ export function resolveDualHandTools(animType, stepCodigo, baseRightItem) {
   }
   return { rightTool: baseRightItem || null, leftTool: null };
 }
+
 

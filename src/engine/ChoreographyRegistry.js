@@ -11,6 +11,7 @@ import {
   UNIVERSAL_HUMAN_ROUTINES,
   IMPERIA_SPECIAL_ROUTINES
 } from './ProcessFactory.js';
+import { IMPERIARTE_CATALOG_DB } from '../shared/imperiarteCatalogDB.js';
 
 // ============================================================================
 // 1. ZONAS ARQUITECTÓNICAS 3D DE LOS LOCALES COMERCIALES (PLANTA DEL INMUEBLE)
@@ -188,9 +189,15 @@ export const WAYPOINTS_POR_NEGOCIO = {
     barra_entrega_cliente: [0.2, 0, 0.6],
     barra_entrega_vendedor: [0.2, 0, -0.6],
     eq_pap_docucolor: [-3.2, 0, -3.0],
-    raw_estante_papel: [-0.5, 0, -3.4],
-    raw_estante_toner: [1.5, 0, -3.4],
-    raw_rack_pliegos: [4.0, 0, -2.5],
+    raw_estante_papel: [-0.5, 0, -2.5],
+    raw_estante_toner: [-1.8, 0, -2.8],
+    raw_rack_pliegos: [3.2, 0, -2.5],
+    rack_horizontal_cartones: [3.2, 0, -2.5],
+    rack_horizontal_papeles: [0.4, 0, -2.5],
+    rack_bastidores_caballetes: [-4.1, 0, -0.8],
+    rack_pinturas_medios: [-2.2, 0, -2.8],
+    rack_marcadores_dibujo: [2.8, 0, -0.2],
+    rack_pinceles_herramientas: [4.2, 0, -0.2],
     bano_empleado: [-4.6, 0, 1.0],
     espera_1: [-3.0, 0, 2.5],
     espera_2: [2.8, 0, 2.5]
@@ -1411,6 +1418,94 @@ export const TAREAS_SIN_CLIENTES_POR_NEGOCIO = {
 /**
  * Obtiene la receta coreografiada de un producto o genera una adaptada dinámicamente si es un producto secundario
  */
+function buildImperiArteProductRecipe(item) {
+  const isBoard = Boolean(item.isHorizontalBoard);
+  const insumoId =
+    item.rackKey === 'rack_horizontal_cartones'
+      ? 'mat_pliego_bateria_marquilla'
+      : item.rackKey === 'rack_horizontal_papeles'
+        ? 'mat_papeles_arte_fabriano'
+        : item.rackKey === 'rack_bastidores_caballetes'
+          ? 'mat_bastidores_caballetes'
+          : 'mat_pinturas_marcadores_arte';
+
+  return {
+    id: item.id,
+    negocioId: 'papeleria_imperiarte',
+    nombreProducto: `${item.nombre} (${item.sku})`,
+    precioVenta: item.precio,
+    descripcionIA: `Atención ImperiArte: consulta de ${item.categoria}, extracción ${isBoard ? 'horizontal de repisa de madera' : 'de exhibidor especializado'} y cobro en TPV.`,
+    pasos: [
+      {
+        id: `${item.id}_1`,
+        orden: 1,
+        codigo: 'LISTEN_IMPERIARTE_ORDER',
+        titulo: `Atender pedido: ${item.nombre}`,
+        descripcion: `El cliente solicita ${item.nombre} (${item.categoria}).`,
+        actor: 'ambos',
+        waypointCliente: 'barra_cliente',
+        waypointVendedor: 'barra_vendedor',
+        duracionSegundos: 6.0,
+        equipoKey: null,
+        estadoEquipo: 'OFF',
+        wattsNominales: 0,
+        factorPotencia: 0,
+        itemManoVendedor: null,
+        animacionVendedor: 'TALK_CLIENT',
+        dialogoCliente: `Hola, busco ${item.nombre}.`,
+        dialogoVendedor: isBoard
+          ? '📐 ¡Claro! Voy por el pliego a las repisas horizontales de madera.'
+          : `🎨 Con gusto, lo tomo del área de ${item.categoria}.`
+      },
+      {
+        id: `${item.id}_2`,
+        orden: 2,
+        codigo: isBoard ? 'PULL_HORIZONTAL_BOARD' : 'FETCH_ART_SUPPLY',
+        titulo: isBoard
+          ? 'Extraer cartón/pliego horizontalmente de repisa de madera'
+          : `Tomar artículo de ${item.categoria}`,
+        descripcion: isBoard
+          ? 'Saca el cartón grande de manera horizontal de la repisa multinivel de madera.'
+          : 'Toma el material artístico del estante correspondiente.',
+        actor: 'vendedor',
+        waypointCliente: 'barra_entrega_cliente',
+        waypointVendedor: item.rackKey || 'rack_horizontal_cartones',
+        duracionSegundos: 9.0,
+        equipoKey: null,
+        estadoEquipo: 'OFF',
+        wattsNominales: 0,
+        factorPotencia: 0,
+        insumoId,
+        cantidadInsumo: 1,
+        itemManoVendedor: item.handItem || 'large_cardboard_sheet',
+        animacionVendedor: isBoard ? 'PULL_HORIZONTAL_BOARD' : 'CARRY_PLATE',
+        dialogoVendedor: isBoard
+          ? '🪵 Deslizando pliego horizontal de la repisa...'
+          : `📦 Tomando ${item.marca}...`
+      },
+      {
+        id: `${item.id}_3`,
+        orden: 3,
+        codigo: 'COBRAR_Y_ENTREGAR_IMPERIARTE',
+        titulo: 'Cobro en TPV y entrega de material ImperiArte',
+        descripcion: 'Registra el SKU en caja TPV y entrega el material al cliente.',
+        actor: 'ambos',
+        waypointCliente: 'barra_entrega_cliente',
+        waypointVendedor: 'caja_tpv_vendedor',
+        duracionSegundos: 7.0,
+        equipoKey: 'pap_tpv',
+        estadoEquipo: 'WORK',
+        wattsNominales: 180,
+        factorPotencia: 0.65,
+        itemManoVendedor: item.handItem || 'large_cardboard_sheet',
+        animacionVendedor: isBoard ? 'CARRY_HORIZONTAL_BOARD' : 'OPERATE_TPV',
+        dialogoCliente: '¡Excelente calidad, muchas gracias!',
+        dialogoVendedor: `✅ Cobrado $${item.precio.toFixed(2)} MXN (${item.sku}). ¡Gracias por su compra!`
+      }
+    ]
+  };
+}
+
 export function obtenerCoreografiaProducto(productoId, negocioId = 'hawaiian_paradise', overridesRecetas = {}) {
   if (overridesRecetas && overridesRecetas[productoId]) {
     return overridesRecetas[productoId];
@@ -1431,7 +1526,11 @@ export function obtenerCoreografiaProducto(productoId, negocioId = 'hawaiian_par
     if (pid.includes('b2b')) return RECETAS_COREOGRAFICAS_DETALLADAS.imp_pedido_b2b_empresa;
     return RECETAS_COREOGRAFICAS_DETALLADAS.imp_uniforme_clinico_completo;
   }
-  if (negocioId === 'papeleria_imperiarte') return RECETAS_COREOGRAFICAS_DETALLADAS.pap_impresion_color;
+  if (negocioId === 'papeleria_imperiarte') {
+    const imperiItem = IMPERIARTE_CATALOG_DB.find((it) => it.id === productoId);
+    if (imperiItem) return buildImperiArteProductRecipe(imperiItem);
+    return RECETAS_COREOGRAFICAS_DETALLADAS.pap_impresion_color;
+  }
   if (negocioId === 'bordados_veracruz') {
     return String(productoId || '').includes('melco')
       ? RECETAS_COREOGRAFICAS_DETALLADAS.bv_nombre_melco
