@@ -13,6 +13,7 @@ import MarketingCampaignModal from './components/hud/MarketingCampaignModal.jsx'
 import Sims2CASModal from './components/hud/Sims2CASModal.jsx';
 import TrainingModeOverlay from './components/training/TrainingModeOverlay.jsx';
 import SketchUpImporterModal from './components/editor/SketchUpImporterModal.jsx';
+import SketchupBridgeModal from './components/editor/SketchupBridgeModal.jsx';
 import CollisionAndLayerTool from './components/editor/CollisionAndLayerTool.jsx';
 import GeniePanel from './components/ui/GeniePanel.jsx';
 import AudioBluetoothModal from './components/ui/AudioBluetoothModal.jsx';
@@ -229,8 +230,9 @@ export default function App() {
         {/* Modo Entrenamiento de Empleados con Sliders e IA */}
         <TrainingModeOverlay />
 
-        {/* Modales de Gestión, KPIs, Recibo CFE, Inventario, Marketing e Importador SketchUp */}
+        {/* Modales de Gestión, KPIs, Recibo CFE, Inventario, Marketing, SketchUp Bridge e Importador */}
         <SketchUpImporterModal />
+        <SketchupBridgeModal />
         <KPIsAndEnergyModal />
         <CFEReceiptModal />
         <InventoryStockDrawer />

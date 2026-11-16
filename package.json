@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "package:plugin": "node tools/package_sketchup_plugin.js",
+    "build": "node tools/package_sketchup_plugin.js && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

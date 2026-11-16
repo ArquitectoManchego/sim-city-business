@@ -54,6 +54,7 @@ export default function TopTimeBar({ onOpenAudioModal }) {
 
   const setTrainingMode = useTrainingStore((s) => s.setTrainingMode);
   const setImporterModalOpen = useSceneEditorStore((s) => s.setImporterModalOpen);
+  const setSketchupBridgeModalOpen = useSceneEditorStore((s) => s.setSketchupBridgeModalOpen);
   const setCollisionToolOpen = useSceneEditorStore((s) => s.setCollisionToolOpen);
   const isCollisionToolOpen = useSceneEditorStore((s) => s.isCollisionToolOpen);
   const cutawayWalls = useSceneEditorStore((s) => s.cutawayWalls);
@@ -443,6 +444,16 @@ export default function TopTimeBar({ onOpenAudioModal }) {
           >
             <Megaphone className="w-3.5 h-3.5" />
             <span>Campañas y Fechas</span>
+          </button>
+
+          <button
+            data-testid="open-sketchup-bridge-btn"
+            onClick={() => setSketchupBridgeModalOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-gradient-to-r from-red-600/30 to-amber-600/30 hover:from-red-600/50 hover:to-amber-600/50 border border-red-500/60 text-red-200 text-[11px] font-bold transition shadow-md"
+            title="Conexión Bidireccional con Trimble SketchUp (2018-2026): exporta maqueta 3D, edita y sincroniza"
+          >
+            <Box className="w-3.5 h-3.5 text-red-400" />
+            <span>📐 SketchUp 3D Bridge</span>
           </button>
 
           <button

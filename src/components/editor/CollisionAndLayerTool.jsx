@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { ShieldAlert, Grid, Eye, PlusCircle, Trash2, RotateCcw, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { ShieldAlert, Grid, Eye, PlusCircle, Trash2, RotateCcw, X, ChevronDown, ChevronUp, Box } from 'lucide-react';
 import { useSceneEditorStore } from '../../store/useSceneEditorStore.js';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { NEGOCIOS_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
@@ -13,6 +13,7 @@ import GeniePanel from '../ui/GeniePanel.jsx';
 export default function CollisionAndLayerTool() {
   const isOpen = useSceneEditorStore((s) => s.isCollisionToolOpen);
   const setOpen = useSceneEditorStore((s) => s.setCollisionToolOpen);
+  const setSketchupBridgeModalOpen = useSceneEditorStore((s) => s.setSketchupBridgeModalOpen);
   const showNavMesh = useSceneEditorStore((s) => s.showNavMesh);
   const toggleNavMesh = useSceneEditorStore((s) => s.toggleNavMesh);
   const showCollisionBlocks = useSceneEditorStore((s) => s.showCollisionBlocks);
@@ -168,6 +169,17 @@ export default function CollisionAndLayerTool() {
                 ? 'Haz clic en el piso 3D para colocar colisión...'
                 : 'Agregar Bloque de Colisión con Clic 3D'}
             </span>
+          </button>
+        </div>
+
+        {/* Enlace al Plugin y Exportador de SketchUp */}
+        <div className="pt-1">
+          <button
+            onClick={() => setSketchupBridgeModalOpen(true)}
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-red-600/30 to-amber-600/30 hover:from-red-600/50 hover:to-amber-600/50 border border-red-500/60 text-red-200 text-xs font-bold transition shadow"
+          >
+            <Box className="w-4 h-4 text-red-400" />
+            <span>📐 Abrir en Trimble SketchUp</span>
           </button>
         </div>
 

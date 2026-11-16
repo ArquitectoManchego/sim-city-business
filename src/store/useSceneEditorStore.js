@@ -14,6 +14,8 @@ export const useSceneEditorStore = create((set, get) => ({
   editorTool: 'VIEW', // 'VIEW' | 'ADD_COLLISION' | 'TOGGLE_FLOOR_WALL'
   isImporterModalOpen: false,
   isCollisionToolOpen: false,
+  isSketchupBridgeModalOpen: false,
+  lastSketchupSyncTime: null,
 
   // Bloques de colisión editables por negocio
   collisionBlocksByNegocio: structuredClone(DEFAULT_COLLISION_BLOCKS_POR_NEGOCIO),
@@ -37,6 +39,8 @@ export const useSceneEditorStore = create((set, get) => ({
   setEditorTool: (tool) => set({ editorTool: tool }),
   setImporterModalOpen: (open) => set({ isImporterModalOpen: open }),
   setCollisionToolOpen: (open) => set({ isCollisionToolOpen: open }),
+  setSketchupBridgeModalOpen: (open) => set({ isSketchupBridgeModalOpen: open }),
+  setLastSketchupSyncTime: (time) => set({ lastSketchupSyncTime: time }),
 
   loadEscenaConfigFromCloud: (escena3DConfig) => {
     if (!escena3DConfig) return;
