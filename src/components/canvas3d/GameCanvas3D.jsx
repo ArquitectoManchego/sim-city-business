@@ -341,6 +341,7 @@ export default function GameCanvas3D() {
   const collisionGroupRef = useRef(null);
   const navMeshGroupRef = useRef(null);
   const customModelsGroupRef = useRef(null);
+  const cfeWallGroupRef = useRef(null);
   const cameraTransitionRef = useRef({
     active: false,
     startPos: new THREE.Vector3(),
@@ -712,6 +713,7 @@ export default function GameCanvas3D() {
       meterBox.add(baseSocket, glassDome, rotorDisc);
       cfeWallGroup.add(meterBox);
     }
+    cfeWallGroupRef.current = cfeWallGroup;
     scene.add(cfeWallGroup);
 
     // Contenedores dinámicos para Bloques de Colisión, Grilla NavMesh y Modelos SketchUp
@@ -1288,6 +1290,67 @@ export default function GameCanvas3D() {
         });
       });
 
+      // Ocultar / transparentar Pared de Medidores CFE si no estamos en vista global o inspección CFE u Oficinas
+      if (cfeWallGroupRef.current) {
+        cfeWallGroupRef.current.visible =
+          isAllConsorcio ||
+          activeFocusedNegId === 'CFE_METER_INSPECT' ||
+          activeFocusedNegId === 'oficinas_consorcio';
+      }
+
+      // Ocultar / transparentar Bloques de Colisión, muebles (mesas, sofás) y racks según el local enfocado
+      if (collisionGroupRef.current) {
+        collisionGroupRef.current.children.forEach((child) => {
+          const childNegId = child.userData.negocioId;
+          if (!childNegId) return;
+          const childAlpha =
+            businessAlphasRef.current[childNegId] ??
+            (isAllConsorcio || childNegId === activeFocusedNegId ? 1.0 : 0.0);
+          child.visible = childAlpha > 0.001;
+          if (child.visible) {
+            child.traverse((obj) => {
+              if (obj.isMesh && obj.material) {
+                const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                mats.forEach((m) => {
+                  if (m.userData.baseOpacity === undefined) {
+                    m.userData.baseOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                  }
+                  if (childAlpha >= 0.999) {
+                    m.opacity = m.userData.baseOpacity;
+                    m.transparent = m.userData.baseOpacity < 0.999;
+                  } else {
+                    m.transparent = true;
+                    m.opacity = m.userData.baseOpacity * childAlpha;
+                  }
+                });
+              }
+            });
+          }
+        });
+      }
+
+      // Ocultar celdas de NavMesh y Modelos SketchUp de locales no visibles
+      if (navMeshGroupRef.current) {
+        navMeshGroupRef.current.children.forEach((child) => {
+          const childNegId = child.userData.negocioId;
+          if (!childNegId) return;
+          const childAlpha =
+            businessAlphasRef.current[childNegId] ??
+            (isAllConsorcio || childNegId === activeFocusedNegId ? 1.0 : 0.0);
+          child.visible = childAlpha > 0.001;
+        });
+      }
+      if (customModelsGroupRef.current) {
+        customModelsGroupRef.current.children.forEach((child) => {
+          const childNegId = child.userData.negocioId;
+          if (!childNegId) return;
+          const childAlpha =
+            businessAlphasRef.current[childNegId] ??
+            (isAllConsorcio || childNegId === activeFocusedNegId ? 1.0 : 0.0);
+          child.visible = childAlpha > 0.001;
+        });
+      }
+
       // Gerente General y Familia según visibilidad del local enfocado
       const isMgrInActiveZone =
         freshGame.gerenteState?.currentZoneId === activeFocusedNegId ||
@@ -1321,6 +1384,7 @@ export default function GameCanvas3D() {
         const width = container.clientWidth;
         const height = container.clientHeight;
         const nextLabels = [];
+        const visibleCharBounds = [];
 
         const projectToScreen = (worldVec) => {
           const v = worldVec.clone().project(camera);
@@ -1329,6 +1393,26 @@ export default function GameCanvas3D() {
             x: (v.x * 0.5 + 0.5) * width,
             y: (-(v.y * 0.5) + 0.5) * height
           };
+        };
+
+        const collectCharBound = (mesh, profile) => {
+          if (!mesh || !mesh.visible) return null;
+          const heightM = Math.max(1.2, ((profile?.heightCm || 170) / 100));
+          const footScreen = projectToScreen(new THREE.Vector3(mesh.position.x, 0, mesh.position.z));
+          const headScreen = projectToScreen(new THREE.Vector3(mesh.position.x, heightM, mesh.position.z));
+          if (!footScreen || !headScreen) return null;
+          const charHeightPx = Math.abs(footScreen.y - headScreen.y);
+          if (charHeightPx <= 0) return null;
+          const charWidthPx = Math.max(24, charHeightPx * 0.45);
+          const bound = {
+            left: footScreen.x - charWidthPx / 2,
+            right: footScreen.x + charWidthPx / 2,
+            top: Math.min(headScreen.y, footScreen.y),
+            bottom: Math.max(headScreen.y, footScreen.y),
+            charHeightPx
+          };
+          visibleCharBounds.push(bound);
+          return bound;
         };
 
         // Etiquetas de empleados (1..4 por local) y clientes activos (solo del local visible)
@@ -1346,6 +1430,10 @@ export default function GameCanvas3D() {
             const empMesh = actorGroupsRef.current.employees[empData.id];
             if (!empMesh || !empMesh.visible) return;
             const profile = empMesh.userData.profile;
+            const bound = collectCharBound(empMesh, profile);
+            // La burbuja sólo aparece si la cámara está lo suficientemente cerca para que la burbuja no supere 1/3 de la altura del personaje
+            if (!bound || bound.charHeightPx < 135) return;
+
             const labelY = Math.max(1.85, ((profile?.heightCm || 170) / 100) + 0.30);
             const screenPos = projectToScreen(new THREE.Vector3(empMesh.position.x, labelY, empMesh.position.z));
             if (screenPos) {
@@ -1379,27 +1467,33 @@ export default function GameCanvas3D() {
           });
 
           // Globos de diálogo de los clientes en cola o esperando baño en este negocio
-          const qClients = freshGame.clientesColaPorNegocio[negId] || [];
-          qClients.forEach((cli) => {
+          const allClients = [
+            ...(freshGame.clientesColaPorNegocio[negId] || []),
+            ...(freshGame.clientesPostCompraPorNegocio[negId] || [])
+          ];
+          allClients.forEach((cli) => {
             const cliMesh = actorGroupsRef.current.customers[cli.id];
-            if (cliMesh && cliMesh.visible && cli.globoTexto) {
-              const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.95, cliMesh.position.z));
-              if (cliScreen) {
-                nextLabels.push({
-                  id: `lbl_cli_${cli.id}`,
-                  x: cliScreen.x,
-                  y: cliScreen.y,
-                  badge: cli.nombre,
-                  color: cli.isWaitingRestroom ? '#f59e0b' : '#38bdf8',
-                  text: cli.globoTexto,
-                  isClient: true
-                });
+            if (cliMesh && cliMesh.visible) {
+              const bound = collectCharBound(cliMesh, cliMesh.userData.profile);
+              if (cli.globoTexto && bound && bound.charHeightPx >= 135) {
+                const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.95, cliMesh.position.z));
+                if (cliScreen) {
+                  nextLabels.push({
+                    id: `lbl_cli_${cli.id}`,
+                    x: cliScreen.x,
+                    y: cliScreen.y,
+                    badge: cli.nombre,
+                    color: cli.isWaitingRestroom ? '#f59e0b' : '#38bdf8',
+                    text: cli.globoTexto,
+                    isClient: true
+                  });
+                }
               }
             }
           });
         });
 
-        // Etiqueta flotante del Gerente General (solo si está en el local visible)
+        // Etiqueta flotante del Gerente General (solo si está en el local visible y cámara cercana)
         if (
           mgrData &&
           actorGroupsRef.current.gerente &&
@@ -1407,22 +1501,25 @@ export default function GameCanvas3D() {
           (isAllConsorcio || isMgrInActiveZone)
         ) {
           const mgrMesh = actorGroupsRef.current.gerente;
-          const mgrY = Math.max(2.05, ((mgrMesh.userData.profile?.heightCm || 175) / 100) + 0.56);
-          const mgrScreen = projectToScreen(new THREE.Vector3(mgrMesh.position.x, mgrY, mgrMesh.position.z));
-          if (mgrScreen && mgrData.textoAccion) {
-            nextLabels.push({
-              id: 'lbl_gerente_general',
-              x: mgrScreen.x,
-              y: mgrScreen.y,
-              badge: '👑 Alex (Gerente General)',
-              color: '#facc15',
-              text: mgrData.textoAccion,
-              isClient: false
-            });
+          const bound = collectCharBound(mgrMesh, mgrMesh.userData?.profile);
+          if (bound && bound.charHeightPx >= 135 && mgrData.textoAccion) {
+            const mgrY = Math.max(2.05, ((mgrMesh.userData.profile?.heightCm || 175) / 100) + 0.56);
+            const mgrScreen = projectToScreen(new THREE.Vector3(mgrMesh.position.x, mgrY, mgrMesh.position.z));
+            if (mgrScreen) {
+              nextLabels.push({
+                id: 'lbl_gerente_general',
+                x: mgrScreen.x,
+                y: mgrScreen.y,
+                badge: '👑 Alex (Gerente General)',
+                color: '#facc15',
+                text: mgrData.textoAccion,
+                isClient: false
+              });
+            }
           }
         }
 
-        // Etiquetas flotantes de la Familia (solo si están en el local visible)
+        // Etiquetas flotantes de la Familia (solo si están en el local visible y cámara cercana)
         const isFamVisibleInScene =
           isAllConsorcio || famState?.locationZone === activeFocusedNegId;
 
@@ -1435,6 +1532,9 @@ export default function GameCanvas3D() {
             const famId = fam.sims2Id || fam.id;
             const famMesh = actorGroupsRef.current.familia[famId];
             if (!famMesh || !famMesh.visible || !fam.textoAccion) return;
+            const bound = collectCharBound(famMesh, famMesh.userData?.profile);
+            if (!bound || bound.charHeightPx < 135) return;
+
             const famY = Math.max(1.55, ((famMesh.userData.profile?.heightCm || 150) / 100) + 0.42);
             const famScreen = projectToScreen(new THREE.Vector3(famMesh.position.x, famY, famMesh.position.z));
             if (famScreen) {
@@ -1572,6 +1672,29 @@ export default function GameCanvas3D() {
 
         // Aplicar apilado estilo tira cómica a los globos de diálogo (uno arriba y otro abajo, sin superponerse)
         const comicStackedLabels = resolveComicDialogueStacking(nextLabels);
+
+        // Si la burbuja tapa a algún personaje en pantalla, debe mostrar 50% de transparencia
+        comicStackedLabels.forEach((lbl) => {
+          const posX = lbl.x + (lbl.offsetX || 0);
+          const posY = lbl.y + (lbl.offsetY || 0);
+          const bubbleBox = {
+            left: posX - 115,
+            right: posX + 115,
+            top: posY - 52,
+            bottom: posY
+          };
+
+          const isCoveringCharacter = visibleCharBounds.some((cb) => {
+            return (
+              bubbleBox.left < cb.right &&
+              bubbleBox.right > cb.left &&
+              bubbleBox.top < cb.bottom &&
+              bubbleBox.bottom > cb.top
+            );
+          });
+          lbl.isOccludingCharacter = isCoveringCharacter;
+        });
+
         setOverlayLabels(comicStackedLabels);
         setOverlayCashPopups(nextCash);
         setOverlayApplianceTelemetry(nextTelemetry);
@@ -1645,6 +1768,7 @@ export default function GameCanvas3D() {
 
         if (!showCollisionBlocks && b.id?.startsWith('col_oc_sofa')) {
           const sofaGroup = new THREE.Group();
+          sofaGroup.userData.negocioId = negId;
           sofaGroup.position.set(cx + b.x, 0, cz + b.z);
           const fabricMat = new THREE.MeshStandardMaterial({ color: '#1e3a8a', roughness: 0.78 });
           const seat = new THREE.Mesh(new THREE.BoxGeometry(b.w, 0.42, b.d), fabricMat);
@@ -1661,6 +1785,7 @@ export default function GameCanvas3D() {
 
         if (!showCollisionBlocks && b.id?.startsWith('col_hp_mesa_')) {
           const tableGroup = new THREE.Group();
+          tableGroup.userData.negocioId = negId;
           tableGroup.position.set(cx + b.x, 0, cz + b.z);
           const radius = Math.min(b.w, b.d) * 0.46;
           const topMesh = new THREE.Mesh(
@@ -1695,6 +1820,7 @@ export default function GameCanvas3D() {
           opacity: showCollisionBlocks ? 0.65 : 1.0
         });
         const mesh = new THREE.Mesh(boxGeo, boxMat);
+        mesh.userData.negocioId = negId;
         mesh.position.set(cx + b.x, b.h / 2, cz + b.z);
         mesh.castShadow = true;
         mesh.receiveShadow = true;
@@ -1724,6 +1850,7 @@ export default function GameCanvas3D() {
                 side: THREE.DoubleSide
               })
             );
+            tile.userData.negocioId = negId;
             tile.rotation.x = -Math.PI / 2;
             tile.position.set(cx + lx, 0.03, cz + lz);
             navGroup.add(tile);
@@ -1743,6 +1870,7 @@ export default function GameCanvas3D() {
       if (!item.object3D) return;
       const zone = ALL_ZONES_3D[item.negocioId || 'hawaiian_paradise'] || NEGOCIOS_ZONES_3D.hawaiian_paradise;
       const clone = item.object3D.clone();
+      clone.userData.negocioId = item.negocioId || 'hawaiian_paradise';
       clone.position.set(
         zone.center[0] + (item.localX || 0),
         item.localY || 0,
@@ -1819,7 +1947,9 @@ export default function GameCanvas3D() {
             className="absolute top-0 left-0 transition-transform duration-75"
           >
             <div
-              className={`px-2.5 py-1.5 rounded-xl border shadow-lg backdrop-blur-md max-w-[230px] text-xs ${
+              className={`px-2.5 py-1.5 rounded-xl border shadow-lg backdrop-blur-md max-w-[230px] text-xs transition-opacity duration-150 ${
+                lbl.isOccludingCharacter ? 'opacity-50' : 'opacity-100'
+              } ${
                 lbl.isClient
                   ? 'bg-sky-950/90 border-sky-400/50 text-sky-100'
                   : 'bg-slate-900/90 border-slate-700/80 text-slate-100'

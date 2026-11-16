@@ -14,7 +14,14 @@ export default function FloatingBusinessStatsBar() {
   const statsPorNegocio = useGameStore((s) => s.statsPorNegocio);
   const equiposRuntime = useGameStore((s) => s.equiposRuntime);
   const setFocusedNegocioId = useGameStore((s) => s.setFocusedNegocioId);
+  const focusedNegocioId = useGameStore((s) => s.focusedNegocioId);
   const [statsVisible, setStatsVisible] = useState(true);
+
+  // Filtrar negocios para mostrar: si el usuario está viendo un negocio específico, mostrar solo ese; si está en consorcio o vista general, mostrar todos
+  const displayedNegocios =
+    focusedNegocioId && NEGOCIOS_ACTIVOS_IDS.includes(focusedNegocioId)
+      ? [focusedNegocioId]
+      : NEGOCIOS_ACTIVOS_IDS;
 
   // Calcular consumo actual en Watts por negocio
   const wattsPorNegocio = {};
@@ -62,7 +69,7 @@ export default function FloatingBusinessStatsBar() {
         className="flex-1 min-w-0"
       >
         <div className="flex flex-nowrap items-start justify-between gap-4 overflow-x-auto pb-1">
-          {NEGOCIOS_ACTIVOS_IDS.map((negId) => {
+          {displayedNegocios.map((negId) => {
             const zone = NEGOCIOS_ZONES_3D[negId];
             const st = statsPorNegocio[negId] || {};
             const wattsActuales = wattsPorNegocio[negId] || 0;

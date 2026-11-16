@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three-stdlib';
-import { X, RotateCcw, Sparkles, User, Sliders, Shirt, Ruler } from 'lucide-react';
+import { X, RotateCcw, Sparkles, User, Sliders, Shirt, Ruler, Watch } from 'lucide-react';
 import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js';
 import { NEGOCIOS_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
 import {
@@ -9,9 +9,17 @@ import {
   SIMS2_HAIR_STYLES,
   SIMS2_OUTFIT_TOP_STYLES,
   SIMS2_OUTFIT_BOTTOM_STYLES,
+  SIMS2_FABRIC_TYPES,
+  SIMS2_ETHNICITIES,
+  SIMS2_GLUTE_SHAPES,
+  SIMS2_BUST_SHAPES,
+  SIMS2_BUST_CUPS,
+  SIMS2_EYEBROW_SHAPES,
+  SIMS2_ACCESSORIES_CATALOG,
   SIMS2_COMPLEXIONS,
   SIMS2_FACE_SLIDER_GROUPS,
   DEFAULT_FACE_SLIDERS,
+  DEFAULT_BODY_MEASUREMENTS,
   preloadSims2Assets,
   createSims2ActorGroup,
   syncSims2ActorProfile,
@@ -185,6 +193,10 @@ export default function Sims2CASModal() {
     updateSims2AvatarConfig(selectedId, {
       faceSliders: { ...(profile.faceSliders || DEFAULT_FACE_SLIDERS), [key]: parseFloat(value) }
     });
+  const patchAccessory = (accKey, val) =>
+    updateSims2AvatarConfig(selectedId, {
+      accessories: { ...(profile.accessories || DEFAULT_BODY_MEASUREMENTS.accessories), [accKey]: val }
+    });
 
   const targetH = Math.max(1.15, (profile.heightCm || 170) / 100);
   const bmi = ((profile.weightKg || 70) / (targetH * targetH)).toFixed(1);
@@ -285,9 +297,10 @@ export default function Sims2CASModal() {
             <div className="flex flex-wrap gap-1 px-3 py-2 border-b border-cyan-400/20 bg-blue-950/60">
               {[
                 { id: 'genetica', label: 'Genética y Cabello', icon: User },
-                { id: 'cuerpo', label: 'Cuerpo y Medidas (cm)', icon: Ruler },
-                { id: 'rostro', label: '27 Sliders Faciales', icon: Sliders },
-                { id: 'ropa', label: 'Vestuario / Uniforme', icon: Shirt },
+                { id: 'cuerpo', label: 'Cuerpo, Músculos y Glúteos', icon: Ruler },
+                { id: 'rostro', label: 'Etnia, Cejas y Rostro', icon: Sliders },
+                { id: 'ropa', label: 'Prendas 3D y Telas', icon: Shirt },
+                { id: 'accesorios', label: 'Accesorios 3D', icon: Watch },
                 { id: 'aura', label: 'Aura y Plumbob', icon: Sparkles }
               ].map((t) => {
                 const Icon = t.icon;
@@ -462,6 +475,7 @@ export default function Sims2CASModal() {
 
               {activeTab === 'cuerpo' && (
                 <div className="space-y-4">
+                  {/* Complexión General */}
                   <div>
                     <label className="block text-[11px] font-bold text-cyan-300 mb-1.5">
                       Complexión Física (Morphs Fits & Fats Sims 2)
@@ -483,52 +497,262 @@ export default function Sims2CASModal() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    {[
-                      { key: 'heightCm', label: 'Estatura', min: 115, max: 200, unit: 'cm' },
-                      { key: 'weightKg', label: 'Peso Corporal', min: 25, max: 135, unit: 'kg' },
-                      { key: 'shoulderCm', label: 'Medida de Hombro', min: 30, max: 58, unit: 'cm' },
-                      { key: 'bustCm', label: 'Medida de Pecho / Busto', min: 58, max: 130, unit: 'cm' },
-                      { key: 'waistCm', label: 'Medida de Cintura', min: 48, max: 125, unit: 'cm' },
-                      { key: 'hipCm', label: 'Medida de Cadera', min: 58, max: 135, unit: 'cm' }
-                    ].map((m) => (
-                      <div key={m.key} className="p-3 rounded-xl bg-slate-900/75 border border-cyan-400/25">
-                        <div className="flex justify-between text-xs font-bold mb-1">
-                          <span>{m.label}</span>
-                          <span className="text-emerald-300">
-                            {profile[m.key]} {m.unit}
-                          </span>
+                  {/* Medidas Biométricas Principales en cm */}
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-3">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">Medidas Biométricas (cm)</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { key: 'heightCm', label: 'Estatura', min: 115, max: 200, unit: 'cm' },
+                        { key: 'weightKg', label: 'Peso Corporal', min: 25, max: 135, unit: 'kg' },
+                        { key: 'shoulderCm', label: 'Medida de Hombro', min: 30, max: 58, unit: 'cm' },
+                        { key: 'bustCm', label: 'Medida de Pecho / Busto', min: 58, max: 130, unit: 'cm' },
+                        { key: 'waistCm', label: 'Medida de Cintura', min: 48, max: 125, unit: 'cm' },
+                        { key: 'hipCm', label: 'Medida de Cadera', min: 58, max: 135, unit: 'cm' }
+                      ].map((m) => (
+                        <div key={m.key} className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20">
+                          <div className="flex justify-between text-xs font-bold mb-1">
+                            <span>{m.label}</span>
+                            <span className="text-emerald-300">
+                              {profile[m.key]} {m.unit}
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            data-testid={`cas-measure-${m.key}`}
+                            min={m.min}
+                            max={m.max}
+                            step={1}
+                            value={profile[m.key] ?? m.min}
+                            onChange={(e) => patchProfile({ [m.key]: Number(e.target.value) })}
+                            className="w-full accent-emerald-400"
+                          />
                         </div>
-                        <input
-                          type="range"
-                          data-testid={`cas-measure-${m.key}`}
-                          min={m.min}
-                          max={m.max}
-                          step={1}
-                          value={profile[m.key] ?? m.min}
-                          onChange={(e) => patchProfile({ [m.key]: Number(e.target.value) })}
-                          className="w-full accent-emerald-400"
-                        />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Esculpir Musculatura y Extremidades */}
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-3">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                      Musculatura y Definición de Extremidades
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {[
+                        { key: 'biceps', label: 'Bíceps (Brazos)', min: -0.5, max: 1.2, step: 0.05, def: 0.2 },
+                        { key: 'forearms', label: 'Antebrazos', min: -0.5, max: 1.2, step: 0.05, def: 0.15 },
+                        { key: 'quads', label: 'Cuádriceps (Muslos)', min: -0.5, max: 1.2, step: 0.05, def: 0.25 },
+                        { key: 'calves', label: 'Chamorros / Gemelos', min: -0.5, max: 1.2, step: 0.05, def: 0.15 },
+                        { key: 'abdomenMuscle', label: 'Definición Abdomen', min: 0.0, max: 1.2, step: 0.05, def: 0.35 }
+                      ].map((sl) => {
+                        const val = profile[sl.key] ?? sl.def;
+                        return (
+                          <div key={sl.key} className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20">
+                            <div className="flex justify-between text-xs font-bold mb-1">
+                              <span>{sl.label}</span>
+                              <span className="text-cyan-300">{Number(val).toFixed(2)}</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={sl.min}
+                              max={sl.max}
+                              step={sl.step}
+                              value={val}
+                              onChange={(e) => patchProfile({ [sl.key]: parseFloat(e.target.value) })}
+                              className="w-full accent-cyan-400"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Esculpir Glúteos y Curvatura Anatómica */}
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-3">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                      Esculpir Glúteos y Curvatura Anatómica
+                    </h4>
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-200 mb-1.5">Forma Anatómica de Glúteos</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {SIMS2_GLUTE_SHAPES.map((g) => (
+                          <button
+                            key={g.id}
+                            onClick={() => patchProfile({ glutesShape: g.id })}
+                            className={`px-2 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                              (profile.glutesShape || 'redondo') === g.id
+                                ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-bold'
+                                : 'bg-slate-950 text-cyan-100 border-cyan-400/25 hover:bg-slate-800'
+                            }`}
+                          >
+                            {g.label}
+                          </button>
+                        ))}
                       </div>
-                    ))}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      {[
+                        { key: 'glutesVolume', label: 'Volumen General Glúteos', min: 0.0, max: 1.5, step: 0.05, def: 0.35 },
+                        { key: 'glutesFat', label: 'Volumen Grasa en Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.15 },
+                        { key: 'glutesMuscle', label: 'Volumen Músculo en Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.35 },
+                        { key: 'glutesRoundness', label: 'Redondez de Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.65 }
+                      ].map((sl) => {
+                        const val = profile[sl.key] ?? sl.def;
+                        return (
+                          <div key={sl.key} className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20">
+                            <div className="flex justify-between text-xs font-bold mb-1">
+                              <span>{sl.label}</span>
+                              <span className="text-emerald-300">{Number(val).toFixed(2)}</span>
+                            </div>
+                            <input
+                              type="range"
+                              min={sl.min}
+                              max={sl.max}
+                              step={sl.step}
+                              value={val}
+                              onChange={(e) => patchProfile({ [sl.key]: parseFloat(e.target.value) })}
+                              className="w-full accent-emerald-400"
+                            />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Esculpir Pecho y Busto */}
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-3">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                      Esculpir Pecho y Busto (Copa y Silueta)
+                    </h4>
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-200 mb-1.5">Tamaño de Copa de Busto</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                        {SIMS2_BUST_CUPS.map((cup) => (
+                          <button
+                            key={cup.id}
+                            onClick={() => patchProfile({ bustCup: cup.id })}
+                            className={`px-2 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                              (profile.bustCup || 'C') === cup.id
+                                ? 'bg-emerald-500 text-slate-950 border-emerald-300 font-bold'
+                                : 'bg-slate-950 text-cyan-100 border-cyan-400/25 hover:bg-slate-800'
+                            }`}
+                          >
+                            {cup.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-200 mb-1.5">Forma Anatómica de Busto</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {SIMS2_BUST_SHAPES.map((b) => (
+                          <button
+                            key={b.id}
+                            onClick={() => patchProfile({ bustShape: b.id })}
+                            className={`px-2 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                              (profile.bustShape || 'semi_esfera') === b.id
+                                ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-bold'
+                                : 'bg-slate-950 text-cyan-100 border-cyan-400/25 hover:bg-slate-800'
+                            }`}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
 
               {activeTab === 'rostro' && (
                 <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-cyan-200">
-                      Modifica forma de rostro y los 27 canales geométricos faciales en vivo
-                    </span>
-                    <button
-                      onClick={() => patchProfile({ faceSliders: { ...DEFAULT_FACE_SLIDERS } })}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-cyan-400/30 text-[11px] font-bold"
-                    >
-                      <RotateCcw className="w-3 h-3" /> Restablecer Rostro
-                    </button>
+                  {/* Forma de Rostro y Etnicidades */}
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                        Forma de Rostro y Etnicidades (Geometría Ósea)
+                      </h4>
+                      <button
+                        onClick={() => patchProfile({ faceSliders: { ...DEFAULT_FACE_SLIDERS } })}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-cyan-400/30 text-[11px] font-bold"
+                      >
+                        <RotateCcw className="w-3 h-3" /> Restablecer Rostro
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                      {SIMS2_ETHNICITIES.map((eth) => (
+                        <button
+                          key={eth.id}
+                          onClick={() => patchProfile({ ethnicity: eth.id })}
+                          className={`px-2 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                            (profile.ethnicity || 'latino') === eth.id
+                              ? 'bg-emerald-500 text-slate-950 border-emerald-300 font-bold'
+                              : 'bg-slate-950 text-cyan-100 border-cyan-400/25 hover:bg-slate-800'
+                          }`}
+                        >
+                          {eth.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
+                  {/* Diseño y Forma de Cejas */}
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-3">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                      Diseño, Grosor y Espesor de Cejas
+                    </h4>
+                    <div>
+                      <label className="block text-[11px] font-bold text-cyan-200 mb-1.5">Forma de Cejas</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {SIMS2_EYEBROW_SHAPES.map((b) => (
+                          <button
+                            key={b.id}
+                            onClick={() => patchProfile({ browShape: b.id })}
+                            className={`px-2 py-1.5 rounded-lg border text-xs font-semibold transition ${
+                              (profile.browShape || 'arqueadas') === b.id
+                                ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-bold'
+                                : 'bg-slate-950 text-cyan-100 border-cyan-400/25 hover:bg-slate-800'
+                            }`}
+                          >
+                            {b.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20">
+                        <div className="flex justify-between text-xs font-bold mb-1">
+                          <span>Grosor de Cejas</span>
+                          <span className="text-cyan-300">{(profile.browThickness ?? 0).toFixed(2)}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-1}
+                          max={1}
+                          step={0.05}
+                          value={profile.browThickness ?? 0}
+                          onChange={(e) => patchProfile({ browThickness: parseFloat(e.target.value) })}
+                          className="w-full accent-cyan-400"
+                        />
+                      </div>
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20">
+                        <div className="flex justify-between text-xs font-bold mb-1">
+                          <span>Espesor / Densidad de Cejas</span>
+                          <span className="text-cyan-300">{(profile.browDensity ?? 0.3).toFixed(2)}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={-1}
+                          max={1}
+                          step={0.05}
+                          value={profile.browDensity ?? 0.3}
+                          onChange={(e) => patchProfile({ browDensity: parseFloat(e.target.value) })}
+                          className="w-full accent-cyan-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 27 Sliders Faciales Paramétricos */}
                   {SIMS2_FACE_SLIDER_GROUPS.map((grp) => (
                     <div key={grp.group} className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/20 space-y-2.5">
                       <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">{grp.group}</h4>
@@ -563,65 +787,117 @@ export default function Sims2CASModal() {
               {activeTab === 'ropa' && (
                 <div className="space-y-4">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="p-3 rounded-xl bg-slate-900/75 border border-cyan-400/25 space-y-2">
-                      <label className="block text-xs font-bold text-cyan-300">Prenda Superior (Top / Uniforme)</label>
-                      <select
-                        value={profile.topStyle || 'polo'}
-                        onChange={(e) => patchProfile({ topStyle: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-400/30 text-xs font-semibold"
-                      >
-                        {SIMS2_OUTFIT_TOP_STYLES.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {COLOR_SWATCHES_CLOTHES.map((hex) => (
-                          <button
-                            key={hex}
-                            onClick={() => patchProfile({ topColor: hex })}
-                            className={`w-6 h-6 rounded-full border-2 ${profile.topColor === hex ? 'border-emerald-400 scale-110' : 'border-white/25'}`}
-                            style={{ backgroundColor: hex }}
+                    {/* Prenda Superior 3D y Tela */}
+                    <div className="p-3 rounded-xl bg-slate-900/75 border border-cyan-400/25 space-y-2.5">
+                      <div>
+                        <label className="block text-xs font-bold text-cyan-300 mb-1">
+                          Prenda Superior 3D (Corte / Uniforme)
+                        </label>
+                        <select
+                          value={profile.topStyle || 'polo'}
+                          onChange={(e) => patchProfile({ topStyle: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-400/30 text-xs font-semibold"
+                        >
+                          {SIMS2_OUTFIT_TOP_STYLES.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-cyan-300 mb-1">
+                          Tipo de Tela Superior
+                        </label>
+                        <select
+                          value={profile.topFabric || 'algodon'}
+                          onChange={(e) => patchProfile({ topFabric: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-400/30 text-xs font-semibold"
+                        >
+                          {SIMS2_FABRIC_TYPES.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-cyan-200 mb-1">Color de Prenda Superior</label>
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {COLOR_SWATCHES_CLOTHES.map((hex) => (
+                            <button
+                              key={hex}
+                              onClick={() => patchProfile({ topColor: hex })}
+                              className={`w-6 h-6 rounded-full border-2 ${profile.topColor === hex ? 'border-emerald-400 scale-110' : 'border-white/25'}`}
+                              style={{ backgroundColor: hex }}
+                            />
+                          ))}
+                          <input
+                            type="color"
+                            value={profile.topColor || '#3b82f6'}
+                            onChange={(e) => patchProfile({ topColor: e.target.value })}
+                            className="w-7 h-7 rounded cursor-pointer bg-transparent"
                           />
-                        ))}
-                        <input
-                          type="color"
-                          value={profile.topColor || '#3b82f6'}
-                          onChange={(e) => patchProfile({ topColor: e.target.value })}
-                          className="w-7 h-7 rounded cursor-pointer bg-transparent"
-                        />
+                        </div>
                       </div>
                     </div>
 
-                    <div className="p-3 rounded-xl bg-slate-900/75 border border-cyan-400/25 space-y-2">
-                      <label className="block text-xs font-bold text-cyan-300">Prenda Inferior (Pantalón / Falda)</label>
-                      <select
-                        value={profile.bottomStyle || 'jeans'}
-                        onChange={(e) => patchProfile({ bottomStyle: e.target.value })}
-                        className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-400/30 text-xs font-semibold"
-                      >
-                        {SIMS2_OUTFIT_BOTTOM_STYLES.map((s) => (
-                          <option key={s.id} value={s.id}>
-                            {s.label}
-                          </option>
-                        ))}
-                      </select>
-                      <div className="flex flex-wrap gap-1.5 pt-1">
-                        {['#1e293b', '#0f172a', '#1e3a8a', '#064e3b', '#3f3f46', '#78350f', '#f8fafc'].map((hex) => (
-                          <button
-                            key={hex}
-                            onClick={() => patchProfile({ bottomColor: hex })}
-                            className={`w-6 h-6 rounded-full border-2 ${profile.bottomColor === hex ? 'border-emerald-400 scale-110' : 'border-white/25'}`}
-                            style={{ backgroundColor: hex }}
+                    {/* Prenda Inferior 3D y Tela */}
+                    <div className="p-3 rounded-xl bg-slate-900/75 border border-cyan-400/25 space-y-2.5">
+                      <div>
+                        <label className="block text-xs font-bold text-cyan-300 mb-1">
+                          Prenda Inferior 3D (Pantalón / Falda)
+                        </label>
+                        <select
+                          value={profile.bottomStyle || 'jeans'}
+                          onChange={(e) => patchProfile({ bottomStyle: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-400/30 text-xs font-semibold"
+                        >
+                          {SIMS2_OUTFIT_BOTTOM_STYLES.map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {s.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-cyan-300 mb-1">
+                          Tipo de Tela Inferior
+                        </label>
+                        <select
+                          value={profile.bottomFabric || 'mezclilla'}
+                          onChange={(e) => patchProfile({ bottomFabric: e.target.value })}
+                          className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-cyan-400/30 text-xs font-semibold"
+                        >
+                          {SIMS2_FABRIC_TYPES.map((f) => (
+                            <option key={f.id} value={f.id}>
+                              {f.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-[11px] font-bold text-cyan-200 mb-1">Color de Prenda Inferior</label>
+                        <div className="flex flex-wrap gap-1.5 pt-0.5">
+                          {['#1e293b', '#0f172a', '#1e3a8a', '#064e3b', '#3f3f46', '#78350f', '#f8fafc'].map((hex) => (
+                            <button
+                              key={hex}
+                              onClick={() => patchProfile({ bottomColor: hex })}
+                              className={`w-6 h-6 rounded-full border-2 ${profile.bottomColor === hex ? 'border-emerald-400 scale-110' : 'border-white/25'}`}
+                              style={{ backgroundColor: hex }}
+                            />
+                          ))}
+                          <input
+                            type="color"
+                            value={profile.bottomColor || '#1e293b'}
+                            onChange={(e) => patchProfile({ bottomColor: e.target.value })}
+                            className="w-7 h-7 rounded cursor-pointer bg-transparent"
                           />
-                        ))}
-                        <input
-                          type="color"
-                          value={profile.bottomColor || '#1e293b'}
-                          onChange={(e) => patchProfile({ bottomColor: e.target.value })}
-                          className="w-7 h-7 rounded cursor-pointer bg-transparent"
-                        />
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -643,6 +919,131 @@ export default function Sims2CASModal() {
                         onChange={(e) => patchProfile({ shoeColor: e.target.value })}
                         className="w-8 h-8 rounded cursor-pointer bg-transparent"
                       />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'accesorios' && (
+                <div className="space-y-4">
+                  <div className="p-3 rounded-xl bg-slate-900/65 border border-cyan-400/25 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-extrabold uppercase tracking-wider text-cyan-300">
+                        Accesorios 3D Acoplados a Huesos del Esqueleto
+                      </h4>
+                      <span className="text-[11px] text-emerald-300 font-semibold">
+                        Sincronizados en tiempo real a 60 FPS
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* Reloj */}
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20 space-y-1">
+                        <label className="block text-xs font-bold text-cyan-200">
+                          ⌚ Reloj (Muñeca Izquierda)
+                        </label>
+                        <select
+                          value={profile.accessories?.reloj || 'ninguno'}
+                          onChange={(e) => patchAccessory('reloj', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold text-cyan-50"
+                        >
+                          {SIMS2_ACCESSORIES_CATALOG.reloj.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Gorra / Sombrero */}
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20 space-y-1">
+                        <label className="block text-xs font-bold text-cyan-200">
+                          🧢 Gorra / Sombrero (Cabeza)
+                        </label>
+                        <select
+                          value={profile.accessories?.gorra || 'ninguno'}
+                          onChange={(e) => patchAccessory('gorra', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold text-cyan-50"
+                        >
+                          {SIMS2_ACCESSORIES_CATALOG.gorra.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Lentes 3D */}
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20 space-y-1">
+                        <label className="block text-xs font-bold text-cyan-200">
+                          👓 Lentes 3D (Rostro)
+                        </label>
+                        <select
+                          value={profile.accessories?.lentes || 'ninguno'}
+                          onChange={(e) => patchAccessory('lentes', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold text-cyan-50"
+                        >
+                          {SIMS2_ACCESSORIES_CATALOG.lentes.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Pulsera */}
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20 space-y-1">
+                        <label className="block text-xs font-bold text-cyan-200">
+                          📿 Pulsera (Muñeca Derecha)
+                        </label>
+                        <select
+                          value={profile.accessories?.pulsera || 'ninguno'}
+                          onChange={(e) => patchAccessory('pulsera', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold text-cyan-50"
+                        >
+                          {SIMS2_ACCESSORIES_CATALOG.pulsera.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Collar */}
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20 space-y-1">
+                        <label className="block text-xs font-bold text-cyan-200">
+                          💎 Collar (Cuello)
+                        </label>
+                        <select
+                          value={profile.accessories?.collar || 'ninguno'}
+                          onChange={(e) => patchAccessory('collar', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold text-cyan-50"
+                        >
+                          {SIMS2_ACCESSORIES_CATALOG.collar.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Aretes */}
+                      <div className="p-2.5 rounded-lg bg-slate-950/70 border border-cyan-400/20 space-y-1">
+                        <label className="block text-xs font-bold text-cyan-200">
+                          ✨ Aretes (Orejas)
+                        </label>
+                        <select
+                          value={profile.accessories?.aretes || 'ninguno'}
+                          onChange={(e) => patchAccessory('aretes', e.target.value)}
+                          className="w-full px-3 py-1.5 rounded-lg bg-slate-900 border border-cyan-400/30 text-xs font-semibold text-cyan-50"
+                        >
+                          {SIMS2_ACCESSORIES_CATALOG.aretes.map((opt) => (
+                            <option key={opt.id} value={opt.id}>
+                              {opt.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
                   </div>
                 </div>

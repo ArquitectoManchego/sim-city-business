@@ -26,19 +26,107 @@ export const SIMS2_HAIR_STYLES = [
 ];
 
 export const SIMS2_OUTFIT_TOP_STYLES = [
-  { id: 'polo', label: 'Playera Polo' },
-  { id: 'filipina', label: 'Filipina Médica / Chef' },
-  { id: 'camisa', label: 'Camisa de Vestir' },
+  { id: 'polo', label: 'Playera Polo (Cuello Doblado 3D)' },
+  { id: 'filipina', label: 'Filipina Médica / Chef (Doble Botonadura 3D)' },
+  { id: 'camisa', label: 'Camisa de Vestir (Cuello Alzado 3D)' },
   { id: 'tshirt', label: 'Playera Cuello Redondo' },
-  { id: 'hoodie', label: 'Sudadera / Chamarra' }
+  { id: 'hoodie', label: 'Sudadera con Capucha y Bolsillo Canguro 3D' },
+  { id: 'mandil', label: 'Mandil / Delantal de Taller / Cocina 3D' },
+  { id: 'chamarra', label: 'Chamarra de Trabajo con Cierre 3D' }
 ];
 
 export const SIMS2_OUTFIT_BOTTOM_STYLES = [
   { id: 'pantalon_vestir', label: 'Pantalón Vestir / Quirúrgico' },
-  { id: 'jeans', label: 'Mezclilla / Jeans' },
-  { id: 'cargo', label: 'Pantalón Cargo Industrial' },
-  { id: 'falda', label: 'Escolar / Falda Tabla' }
+  { id: 'jeans', label: 'Mezclilla / Jeans Clásicos' },
+  { id: 'cargo', label: 'Pantalón Cargo (Bolsillos Tácticos 3D)' },
+  { id: 'falda', label: 'Falda Escolar con Tablas / Vuelo 3D' },
+  { id: 'bermuda', label: 'Bermudas Industriales / Shorts' }
 ];
+
+export const SIMS2_FABRIC_TYPES = [
+  { id: 'algodon', label: 'Algodón Peinado (Mate suave)' },
+  { id: 'mezclilla', label: 'Mezclilla (Denim twill 45°)' },
+  { id: 'gabardina', label: 'Gabardina Estructural' },
+  { id: 'antifluido', label: 'Antifluido Clínico / Microfibra' },
+  { id: 'lino', label: 'Lino Natural (Textura hilo)' },
+  { id: 'seda', label: 'Seda / Satín (Brillo sedoso)' }
+];
+
+export const SIMS2_ETHNICITIES = [
+  { id: 'latino', label: 'Latino / Mestizo Cálido' },
+  { id: 'caucasica', label: 'Caucásica / Europea' },
+  { id: 'africano', label: 'Africano / Afrodescendiente' },
+  { id: 'asiatico', label: 'Asiático / Oriental' },
+  { id: 'medio_oriente', label: 'Medio Oriente / Árabe' }
+];
+
+export const SIMS2_GLUTE_SHAPES = [
+  { id: 'redondo', label: 'Redondo Clásico' },
+  { id: 'bubblebutt', label: 'Bubble Butt (Esférico Alto)' },
+  { id: 'corazon', label: 'Forma de Corazón (A-Shape)' },
+  { id: 'gota', label: 'Forma de Gota (Teardrop)' }
+];
+
+export const SIMS2_BUST_SHAPES = [
+  { id: 'semi_esfera', label: 'Semi-esfera Natural' },
+  { id: 'esfera', label: 'Esfera (Push-up Redondo)' },
+  { id: 'pera', label: 'Forma de Pera (Anatómica)' },
+  { id: 'pico', label: 'Forma de Pico / Cónica' }
+];
+
+export const SIMS2_BUST_CUPS = [
+  { id: 'A', label: 'Copa A (Compacta)' },
+  { id: 'B', label: 'Copa B (Media Natural)' },
+  { id: 'C', label: 'Copa C (Llena)' },
+  { id: 'D', label: 'Copa D (Voluminosa)' },
+  { id: 'DD', label: 'Copa DD / E (Extra Voluminosa)' }
+];
+
+export const SIMS2_EYEBROW_SHAPES = [
+  { id: 'arqueadas', label: 'Arqueadas Clásicas' },
+  { id: 'rectas', label: 'Rectas Modernas' },
+  { id: 'curvas', label: 'Curvas Suaves' },
+  { id: 'angulares', label: 'Angulares Definidas' }
+];
+
+export const SIMS2_ACCESSORIES_CATALOG = {
+  reloj: [
+    { id: 'ninguno', label: 'Sin Reloj' },
+    { id: 'deportivo_digital', label: 'Smartwatch Deportivo Negro' },
+    { id: 'clasico_oro', label: 'Reloj Clásico de Oro' },
+    { id: 'cuero_ejecutivo', label: 'Reloj Ejecutivo con Correa de Cuero' }
+  ],
+  gorra: [
+    { id: 'ninguno', label: 'Sin Gorra / Sombrero' },
+    { id: 'baseball', label: 'Gorra de Béisbol Deportiva' },
+    { id: 'cofia_chef', label: 'Cofia / Toque de Chef Blanca' },
+    { id: 'visera', label: 'Visera Solar Deportiva' }
+  ],
+  lentes: [
+    { id: 'ninguno', label: 'Sin Lentes' },
+    { id: 'pasta_negra', label: 'Lentes de Pasta Negra' },
+    { id: 'aviador_metalico', label: 'Lentes Aviador Dorados' },
+    { id: 'seguridad_industrial', label: 'Gafas de Seguridad Industrial' }
+  ],
+  pulsera: [
+    { id: 'ninguno', label: 'Sin Pulsera' },
+    { id: 'plata_fina', label: 'Brazalete de Plata Fina' },
+    { id: 'cuero_trenzada', label: 'Pulsera de Cuero Trenzado' },
+    { id: 'cuentas_madera', label: 'Pulsera de Cuentas de Madera' }
+  ],
+  collar: [
+    { id: 'ninguno', label: 'Sin Collar' },
+    { id: 'cadena_oro', label: 'Cadena de Oro 14k' },
+    { id: 'dije_plata', label: 'Collar con Dije de Plata' },
+    { id: 'gargantilla', label: 'Gargantilla / Choker Negro' }
+  ],
+  aretes: [
+    { id: 'ninguno', label: 'Sin Aretes' },
+    { id: 'arracadas_oro', label: 'Arracadas Doradas' },
+    { id: 'broquel_perla', label: 'Broqueles de Perla' },
+    { id: 'aros_plata', label: 'Aros Plateados' }
+  ]
+};
 
 export const SIMS2_COMPLEXIONS = [
   { id: 'delgada', label: 'Delgada', fat: 0.0, fit: 0.15 },
@@ -133,12 +221,42 @@ export const DEFAULT_FACE_SLIDERS = {
   faceWidth: 0
 };
 
+export const DEFAULT_BODY_MEASUREMENTS = {
+  biceps: 0.25,
+  forearms: 0.15,
+  quads: 0.25,
+  calves: 0.15,
+  glutesVolume: 0.35,
+  glutesFat: 0.15,
+  glutesMuscle: 0.35,
+  glutesRoundness: 0.65,
+  glutesShape: 'redondo',
+  abdomenMuscle: 0.35,
+  bustCup: 'C',
+  bustShape: 'semi_esfera',
+  ethnicity: 'latino',
+  browShape: 'arqueadas',
+  browThickness: 0,
+  browDensity: 0.3,
+  topFabric: 'algodon',
+  bottomFabric: 'mezclilla',
+  accessories: {
+    reloj: 'ninguno',
+    gorra: 'ninguno',
+    lentes: 'ninguno',
+    pulsera: 'ninguno',
+    collar: 'ninguno',
+    aretes: 'ninguno'
+  }
+};
+
 /**
  * Perfiles iniciales completos (Gerente, Esposa, Alex 12 años, Bárbara 8 años y Empleados de los 6 negocios)
  */
 export function createDefaultSims2Profiles() {
-  return {
+  const profiles = {
     gerente: {
+      ...DEFAULT_BODY_MEASUREMENTS,
       id: 'gerente',
       displayName: 'Alex (Gerente General)',
       roleTag: 'Gerente / Diseñador Principal',
@@ -166,9 +284,18 @@ export function createDefaultSims2Profiles() {
       hasAura: true,
       auraColor: '#facc15',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, jawWidth: 0.25, cheekboneWidth: 0.15, mouthHeight: 0.25 }
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, jawWidth: 0.25, cheekboneWidth: 0.15, mouthHeight: 0.25 },
+      accessories: {
+        reloj: 'deportivo_digital',
+        gorra: 'ninguno',
+        lentes: 'ninguno',
+        pulsera: 'ninguno',
+        collar: 'ninguno',
+        aretes: 'ninguno'
+      }
     },
     familia_esposa: {
+      ...DEFAULT_BODY_MEASUREMENTS,
       id: 'familia_esposa',
       displayName: 'Esposa (Familia)',
       roleTag: 'Familia — Visita 3–4 PM',
@@ -196,7 +323,23 @@ export function createDefaultSims2Profiles() {
       hasAura: true,
       auraColor: '#f472b6',
       showPlumbob: true,
-      faceSliders: { ...DEFAULT_FACE_SLIDERS, cheekboneWidth: 0.2, eyeSize: 0.2, mouthCornerCurve: 0.25 }
+      glutesVolume: 0.7,
+      glutesFat: 0.35,
+      glutesMuscle: 0.4,
+      glutesRoundness: 0.9,
+      glutesShape: 'bubblebutt',
+      bustCup: 'D',
+      bustShape: 'semi_esfera',
+      topFabric: 'seda',
+      faceSliders: { ...DEFAULT_FACE_SLIDERS, cheekboneWidth: 0.2, eyeSize: 0.2, mouthCornerCurve: 0.25 },
+      accessories: {
+        reloj: 'clasico_oro',
+        gorra: 'ninguno',
+        lentes: 'ninguno',
+        pulsera: 'plata_fina',
+        collar: 'dije_plata',
+        aretes: 'arracadas_oro'
+      }
     },
     familia_alex: {
       id: 'familia_alex',
@@ -433,6 +576,17 @@ export function createDefaultSims2Profiles() {
       faceSliders: { ...DEFAULT_FACE_SLIDERS }
     }
   };
+  Object.keys(profiles).forEach((k) => {
+    profiles[k] = {
+      ...DEFAULT_BODY_MEASUREMENTS,
+      ...profiles[k],
+      accessories: {
+        ...DEFAULT_BODY_MEASUREMENTS.accessories,
+        ...(profiles[k].accessories || {})
+      }
+    };
+  });
+  return profiles;
 }
 
 export function buildCustomerSims2Profile(customerId, shirtColorHex = '#3b82f6') {
@@ -448,6 +602,7 @@ export function buildCustomerSims2Profile(customerId, shirtColorHex = '#3b82f6')
   const pantPalette = ['#1e293b', '#334155', '#0f172a', '#3f3f46', '#1e3a8a'];
   const hairPalette = ['#111111', '#2c1b12', '#4a3020', '#6b4728', '#8c6239'];
   return {
+    ...DEFAULT_BODY_MEASUREMENTS,
     id: `cust_${customerId}`,
     displayName: 'Cliente',
     baseModel,
@@ -628,6 +783,146 @@ function injectSims2MorphTargets(mesh, nativeHeight) {
       const r = Math.hypot(x, z) || 0.001;
       return [(x / r) * 0.042 * w, 0, (z / r) * 0.032 * w];
     });
+
+    // Nuevas medidas corporales avanzadas: Bíceps, Antebrazos, Cuádriceps, Chamorros (gemelos), Glúteos y Abdomen
+    addMorph('sims2_biceps', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.70, 0.055) * gauss(absX, 0.22, 0.045);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.024 * w, 0, 0.022 * w * (z > 0 ? 1.2 : 0.8)];
+    });
+
+    addMorph('sims2_forearms', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.60, 0.06) * gauss(absX, 0.32, 0.055);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.020 * w, 0, 0.018 * w];
+    });
+
+    addMorph('sims2_quads', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.38, 0.075) * gauss(absX, 0.11, 0.045) * (z > -0.015 ? 1.0 : 0.4);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.016 * w, 0, (z > 0 ? 0.038 : 0.015) * w];
+    });
+
+    addMorph('sims2_calves', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.21, 0.065) * gauss(absX, 0.085, 0.035);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.015 * w, 0, (z < 0 ? -0.028 : 0.008) * w];
+    });
+
+    addMorph('sims2_abdomen_muscle', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.61, 0.055) * gauss(absX, 0.04, 0.045) * (z > 0.02 ? 1.0 : 0);
+      if (w < 0.02) return [0, 0, 0];
+      return [0, 0, -0.018 * w];
+    });
+
+    // Glúteos: Volumen, Grasa, Músculo, Redondez y Formas específicas
+    addMorph('sims2_glutes_volume', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.49, 0.065) * gauss(absX, 0.09, 0.06) * (z < -0.01 ? 1.0 : 0);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.012 * w, 0, -0.055 * w];
+    });
+
+    addMorph('sims2_glutes_fat', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.46, 0.05) * gauss(absX, 0.10, 0.065) * (z < -0.01 ? 1.0 : 0);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.018 * w, -0.008 * w, -0.045 * w];
+    });
+
+    addMorph('sims2_glutes_muscle', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.52, 0.045) * gauss(absX, 0.08, 0.05) * (z < -0.01 ? 1.0 : 0);
+      if (w < 0.02) return [0, 0, 0];
+      return [0, 0.006 * w, -0.048 * w];
+    });
+
+    addMorph('sims2_glutes_roundness', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.49, 0.055) * gauss(absX, 0.09, 0.055) * (z < 0 ? 1.0 : 0);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.015 * w, 0, -0.038 * w];
+    });
+
+    addMorph('sims2_glutes_corazon', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const wLow = gauss(yn, 0.46, 0.045) * gauss(absX, 0.11, 0.05) * (z < -0.01 ? 1.0 : 0);
+      const wTop = gauss(yn, 0.53, 0.035) * gauss(absX, 0.06, 0.04) * (z < -0.01 ? 1.0 : 0);
+      return [Math.sign(x) * (0.024 * wLow - 0.010 * wTop), 0, -0.042 * wLow + 0.010 * wTop];
+    });
+
+    addMorph('sims2_glutes_bubblebutt', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.50, 0.04) * gauss(absX, 0.08, 0.04) * (z < -0.01 ? 1.0 : 0);
+      return [Math.sign(x) * 0.010 * w, 0.008 * w, -0.062 * w];
+    });
+
+    addMorph('sims2_glutes_gota', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.45, 0.05) * gauss(absX, 0.095, 0.055) * (z < -0.01 ? 1.0 : 0);
+      return [Math.sign(x) * 0.016 * w, -0.012 * w, -0.048 * w];
+    });
+
+    addMorph('sims2_glutes_redondo', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.49, 0.06) * gauss(absX, 0.085, 0.05) * (z < -0.01 ? 1.0 : 0);
+      return [Math.sign(x) * 0.012 * w, 0, -0.045 * w];
+    });
+
+    // Formas de Busto: Copa, Pera, Pico, Esfera, Semi-esfera
+    addMorph('sims2_bust_cup', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.72, 0.05) * gauss(absX, 0.09, 0.045) * (z > 0.02 ? 1.0 : 0);
+      if (w < 0.02) return [0, 0, 0];
+      return [Math.sign(x) * 0.014 * w, -0.005 * w, 0.052 * w];
+    });
+
+    addMorph('sims2_bust_pera', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.70, 0.045) * gauss(absX, 0.09, 0.05) * (z > 0.02 ? 1.0 : 0);
+      return [Math.sign(x) * 0.012 * w, -0.010 * w, 0.038 * w];
+    });
+
+    addMorph('sims2_bust_pico', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.725, 0.032) * gauss(absX, 0.08, 0.035) * (z > 0.03 ? 1.0 : 0);
+      return [0, 0, 0.058 * w];
+    });
+
+    addMorph('sims2_bust_esfera', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.73, 0.04) * gauss(absX, 0.085, 0.04) * (z > 0.02 ? 1.0 : 0);
+      return [Math.sign(x) * 0.015 * w, 0.008 * w, 0.048 * w];
+    });
+
+    addMorph('sims2_bust_semi_esfera', (x, y, z) => {
+      const yn = y / nativeHeight;
+      const absX = Math.abs(x);
+      const w = gauss(yn, 0.718, 0.05) * gauss(absX, 0.085, 0.045) * (z > 0.02 ? 1.0 : 0);
+      return [Math.sign(x) * 0.012 * w, 0, 0.040 * w];
+    });
   }
 
   if (isHead || isHair) {
@@ -671,6 +966,70 @@ function injectSims2MorphTargets(mesh, nativeHeight) {
       const w = gauss(dy, 0.002, 0.024) * gauss(x, 0, 0.018) * (z > 0.055 ? 1 : 0);
       return [0, -0.004 * w * fade, 0.014 * w * fade];
     });
+
+    // Formas Étnicas de Rostro
+    addMorph('face_ethnic_caucasica', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const bridgeW = gauss(dy, 0.005, 0.022) * gauss(x, 0, 0.014) * (z > 0.05 ? 1 : 0);
+      const jawW = gauss(dy, -0.052, 0.030) * (z > -0.01 ? 1 : 0);
+      return [Math.sign(x) * -0.006 * jawW * fade, 0, (0.018 * bridgeW - 0.006 * jawW) * fade];
+    });
+
+    addMorph('face_ethnic_africano', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const noseW = gauss(dy, -0.010, 0.022) * (z > 0.05 ? 1 : 0);
+      const lipW = gauss(dy, -0.032, 0.018) * gauss(x, 0, 0.028) * (z > 0.04 ? 1 : 0);
+      const jawW = gauss(dy, -0.048, 0.035);
+      return [Math.sign(x) * (0.014 * noseW + 0.012 * jawW) * fade, 0, (0.015 * lipW - 0.008 * noseW) * fade];
+    });
+
+    addMorph('face_ethnic_latino', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const cheekW = gauss(dy, -0.008, 0.026) * (z > 0.01 ? 1 : 0.2);
+      const lipW = gauss(dy, -0.032, 0.018) * gauss(x, 0, 0.026) * (z > 0.04 ? 1 : 0);
+      return [Math.sign(x) * 0.012 * cheekW * fade, 0, 0.010 * lipW * fade];
+    });
+
+    addMorph('face_ethnic_medio_oriente', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const noseBridge = gauss(dy, 0.008, 0.024) * gauss(x, 0, 0.016) * (z > 0.05 ? 1 : 0);
+      const chinW = gauss(dy, -0.068, 0.022) * (z > 0.03 ? 1 : 0);
+      return [0, -0.004 * noseBridge * fade, (0.022 * noseBridge + 0.010 * chinW) * fade];
+    });
+
+    addMorph('face_ethnic_asiatico', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const eyeW = gauss(dy, 0.015, 0.022) * (z > 0.04 ? 1 : 0);
+      const bridgeW = gauss(dy, 0.004, 0.020) * (z > 0.05 ? 1 : 0);
+      return [Math.sign(x) * 0.008 * eyeW * fade, 0, (-0.012 * bridgeW) * fade];
+    });
+
+    // Formas de Cejas 3D
+    addMorph('face_brow_arch', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const w = gauss(dy, 0.028, 0.018) * (z > 0.04 ? 1 : 0);
+      return [0, 0.014 * w * fade, 0.004 * w * fade];
+    });
+
+    addMorph('face_brow_straight', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const w = gauss(dy, 0.024, 0.016) * (z > 0.04 ? 1 : 0);
+      return [0, -0.008 * w * fade, 0];
+    });
+
+    addMorph('face_brow_angular', (x, y, z) => {
+      const fade = neckFade(y);
+      const dy = y - headBaseY;
+      const w = gauss(dy, 0.029, 0.016) * gauss(Math.abs(x), 0.038, 0.016) * (z > 0.04 ? 1 : 0);
+      return [0, 0.018 * w * fade, 0.006 * w * fade];
+    });
   }
 
   mesh.updateMorphTargets();
@@ -679,8 +1038,8 @@ function injectSims2MorphTargets(mesh, nativeHeight) {
 /**
  * Genera o recupera de caché una textura PBR teñida desde la textura base original del GLB
  */
-function getTintedCanvasTexture(sourceImage, hexColor, slotName = 'generic', styleId = 'default') {
-  const key = `${slotName}_${styleId}_${hexColor}_${sourceImage?.width || 0}`;
+function getTintedCanvasTexture(sourceImage, hexColor, slotName = 'generic', styleId = 'default', fabricType = 'algodon') {
+  const key = `${slotName}_${styleId}_${fabricType}_${hexColor}_${sourceImage?.width || 0}`;
   if (assetCache.textures.has(key)) {
     return assetCache.textures.get(key);
   }
@@ -732,6 +1091,61 @@ function getTintedCanvasTexture(sourceImage, hexColor, slotName = 'generic', sty
     ctx.fillRect(0, 0, size, size);
   }
 
+  // Texturizado físico realista según tipo de tela
+  if (slotName === 'top' || slotName === 'bottom') {
+    if (fabricType === 'mezclilla') {
+      // Tejido sarga twill 45° con hilos claros/oscuros
+      ctx.strokeStyle = 'rgba(255,255,255,0.09)';
+      ctx.lineWidth = 1.2;
+      for (let d = -size; d < size * 2; d += 5) {
+        ctx.beginPath();
+        ctx.moveTo(d, 0);
+        ctx.lineTo(d + size, size);
+        ctx.stroke();
+      }
+    } else if (fabricType === 'gabardina') {
+      // Costillas diagonales pronunciadas de gabardina pesada
+      ctx.strokeStyle = 'rgba(0,0,0,0.12)';
+      ctx.lineWidth = 1.6;
+      for (let d = -size; d < size * 2; d += 6) {
+        ctx.beginPath();
+        ctx.moveTo(d, 0);
+        ctx.lineTo(d + size * 0.6, size);
+        ctx.stroke();
+      }
+    } else if (fabricType === 'antifluido') {
+      // Microcuadrícula técnica repelente a fluidos
+      ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+      ctx.lineWidth = 1;
+      for (let p = 0; p < size; p += 6) {
+        ctx.beginPath();
+        ctx.moveTo(p, 0); ctx.lineTo(p, size);
+        ctx.moveTo(0, p); ctx.lineTo(size, p);
+        ctx.stroke();
+      }
+    } else if (fabricType === 'lino') {
+      // Hilado irregular orgánico de lino natural
+      ctx.strokeStyle = 'rgba(0,0,0,0.08)';
+      ctx.lineWidth = 1.4;
+      for (let p = 0; p < size; p += 8) {
+        ctx.beginPath();
+        ctx.moveTo(0, p); ctx.lineTo(size, p);
+        ctx.moveTo(p, 0); ctx.lineTo(p, size);
+        ctx.stroke();
+      }
+    } else if (fabricType === 'seda') {
+      // Reflejos especulares satinados
+      const grad = ctx.createLinearGradient(0, 0, size, size);
+      grad.addColorStop(0, 'rgba(255,255,255,0.0)');
+      grad.addColorStop(0.35, 'rgba(255,255,255,0.22)');
+      grad.addColorStop(0.5, 'rgba(255,255,255,0.0)');
+      grad.addColorStop(0.85, 'rgba(255,255,255,0.18)');
+      grad.addColorStop(1, 'rgba(255,255,255,0.0)');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, size, size);
+    }
+  }
+
   // Detalles estilizados según prenda Sims 2
   if (slotName === 'top') {
     if (styleId === 'filipina') {
@@ -743,15 +1157,30 @@ function getTintedCanvasTexture(sourceImage, hexColor, slotName = 'generic', sty
     } else if (styleId === 'polo' || styleId === 'camisa') {
       ctx.fillStyle = 'rgba(255,255,255,0.22)';
       ctx.fillRect(size * 0.44, 10, 28, 36);
+    } else if (styleId === 'hoodie') {
+      ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(size * 0.28, size * 0.55, size * 0.44, size * 0.28);
+    } else if (styleId === 'mandil') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 3.5;
+      ctx.strokeRect(size * 0.22, size * 0.18, size * 0.56, size * 0.65);
     }
-  } else if (slotName === 'bottom' && styleId === 'jeans') {
-    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = 2;
-    for (let y = 0; y < size; y += 6) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(size, y);
-      ctx.stroke();
+  } else if (slotName === 'bottom') {
+    if (styleId === 'jeans') {
+      ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+      ctx.lineWidth = 2;
+      for (let y = 0; y < size; y += 6) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(size, y);
+        ctx.stroke();
+      }
+    } else if (styleId === 'cargo') {
+      ctx.strokeStyle = 'rgba(0,0,0,0.28)';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(14, size * 0.38, 44, 56);
+      ctx.strokeRect(size - 58, size * 0.38, 44, 56);
     }
   }
 
@@ -913,8 +1342,421 @@ function syncAuraAndPlumbob(actorGroup, profile) {
 }
 
 /**
+ * Construye o actualiza prendas 3D reales con geometría física acoplada al esqueleto (filipinas, polos, camisas, hoodies, mandiles, faldas con tablas, cargos)
+ */
+export function syncSims2Garments3D(actorGroup, profile) {
+  const bones = actorGroup.userData.bones;
+  if (!bones) return;
+
+  if (bones.Spine2) {
+    const oldTop = bones.Spine2.getObjectByName('sims2_top_garment_3d');
+    if (oldTop) bones.Spine2.remove(oldTop);
+  }
+  if (bones.Hips) {
+    const oldBottom = bones.Hips.getObjectByName('sims2_bottom_garment_3d');
+    if (oldBottom) bones.Hips.remove(oldBottom);
+  }
+  if (bones.LeftUpLeg) {
+    const oldLeftP = bones.LeftUpLeg.getObjectByName('sims2_leg_pocket_left');
+    if (oldLeftP) bones.LeftUpLeg.remove(oldLeftP);
+  }
+  if (bones.RightUpLeg) {
+    const oldRightP = bones.RightUpLeg.getObjectByName('sims2_leg_pocket_right');
+    if (oldRightP) bones.RightUpLeg.remove(oldRightP);
+  }
+
+  const topCol = new THREE.Color(profile.topColor || '#3b82f6');
+  const bottomCol = new THREE.Color(profile.bottomColor || '#1e293b');
+  const isSilkTop = profile.topFabric === 'seda';
+  const isSilkBottom = profile.bottomFabric === 'seda';
+
+  const topMat = new THREE.MeshStandardMaterial({
+    color: topCol,
+    roughness: isSilkTop ? 0.28 : 0.68,
+    metalness: isSilkTop ? 0.25 : 0.05
+  });
+  const bottomMat = new THREE.MeshStandardMaterial({
+    color: bottomCol,
+    roughness: isSilkBottom ? 0.30 : 0.72,
+    metalness: isSilkBottom ? 0.22 : 0.05
+  });
+  const buttonMat = new THREE.MeshStandardMaterial({ color: '#f8fafc', metalness: 0.82, roughness: 0.22 });
+
+  // PRENDA SUPERIOR 3D REAL
+  if (bones.Spine2) {
+    const topGarment = new THREE.Group();
+    topGarment.name = 'sims2_top_garment_3d';
+
+    if (profile.topStyle === 'filipina') {
+      // Filipina médica / chef: solapa cruzada doble botonadura + cuello mao 3D
+      const flap = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.26, 0.032), topMat);
+      flap.position.set(0.035, 0.05, 0.122);
+      topGarment.add(flap);
+
+      for (let r = 0; r < 4; r++) {
+        const b1 = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.008, 12), buttonMat);
+        b1.rotation.x = Math.PI / 2;
+        b1.position.set(-0.025, 0.13 - r * 0.058, 0.142);
+        const b2 = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.008, 12), buttonMat);
+        b2.rotation.x = Math.PI / 2;
+        b2.position.set(0.042, 0.13 - r * 0.058, 0.142);
+        topGarment.add(b1, b2);
+      }
+      const penPocket = new THREE.Mesh(new THREE.BoxGeometry(0.062, 0.075, 0.015), topMat);
+      penPocket.position.set(-0.088, 0.08, 0.118);
+      topGarment.add(penPocket);
+
+      const maoCollar = new THREE.Mesh(new THREE.CylinderGeometry(0.102, 0.112, 0.040, 20, 1, true), topMat);
+      maoCollar.position.set(0, 0.21, 0.01);
+      topGarment.add(maoCollar);
+    } else if (profile.topStyle === 'polo') {
+      // Cuello doblado 3D sobre los hombros
+      const collarLeft = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.02, 0.11), topMat);
+      collarLeft.position.set(-0.08, 0.185, 0.03);
+      collarLeft.rotation.z = 0.22;
+      collarLeft.rotation.x = 0.15;
+      const collarRight = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.02, 0.11), topMat);
+      collarRight.position.set(0.08, 0.185, 0.03);
+      collarRight.rotation.z = -0.22;
+      collarRight.rotation.x = 0.15;
+
+      const placket = new THREE.Mesh(new THREE.BoxGeometry(0.036, 0.14, 0.015), topMat);
+      placket.position.set(0, 0.10, 0.122);
+      topGarment.add(collarLeft, collarRight, placket);
+
+      for (let i = 0; i < 3; i++) {
+        const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.006, 10), buttonMat);
+        btn.rotation.x = Math.PI / 2;
+        btn.position.set(0, 0.14 - i * 0.042, 0.132);
+        topGarment.add(btn);
+      }
+    } else if (profile.topStyle === 'camisa') {
+      // Camisa formal: cuello rígido alzado + pechera completa con 5 botones
+      const collarBand = new THREE.Mesh(new THREE.CylinderGeometry(0.105, 0.118, 0.042, 20, 1, true), topMat);
+      collarBand.position.set(0, 0.205, 0.01);
+
+      const placket = new THREE.Mesh(new THREE.BoxGeometry(0.030, 0.30, 0.014), topMat);
+      placket.position.set(0, 0.02, 0.122);
+      topGarment.add(collarBand, placket);
+
+      for (let i = 0; i < 5; i++) {
+        const btn = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 0.006, 10), buttonMat);
+        btn.rotation.x = Math.PI / 2;
+        btn.position.set(0, 0.13 - i * 0.055, 0.132);
+        topGarment.add(btn);
+      }
+    } else if (profile.topStyle === 'hoodie') {
+      // Capucha 3D reposando tras la nuca
+      const hoodDrape = new THREE.Mesh(new THREE.SphereGeometry(0.125, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.65), topMat);
+      hoodDrape.rotation.x = Math.PI * 0.85;
+      hoodDrape.position.set(0, 0.15, -0.09);
+
+      // Bolsillo canguro frontal
+      const pouch = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.12, 0.038), topMat);
+      pouch.position.set(0, -0.06, 0.122);
+      topGarment.add(hoodDrape, pouch);
+    } else if (profile.topStyle === 'mandil') {
+      // Peto de delantal / mandil con tirante al cuello
+      const bib = new THREE.Mesh(new THREE.BoxGeometry(0.23, 0.32, 0.02), topMat);
+      bib.position.set(0, 0.02, 0.125);
+
+      const strap = new THREE.Mesh(new THREE.TorusGeometry(0.115, 0.01, 8, 20, Math.PI), topMat);
+      strap.position.set(0, 0.19, 0.02);
+      strap.rotation.x = Math.PI / 2;
+      topGarment.add(bib, strap);
+    } else if (profile.topStyle === 'chamarra') {
+      const zipper = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.32, 0.02), buttonMat);
+      zipper.position.set(0, 0.02, 0.125);
+      const collar = new THREE.Mesh(new THREE.CylinderGeometry(0.112, 0.122, 0.048, 18, 1, true), topMat);
+      collar.position.set(0, 0.205, 0.01);
+      topGarment.add(zipper, collar);
+    }
+
+    bones.Spine2.add(topGarment);
+  }
+
+  // PRENDA INFERIOR 3D REAL
+  if (bones.Hips) {
+    const bottomGarment = new THREE.Group();
+    bottomGarment.name = 'sims2_bottom_garment_3d';
+
+    if (profile.bottomStyle === 'falda') {
+      // Falda con vuelo y tablas 3D
+      const skirtGeo = new THREE.CylinderGeometry(0.22, 0.37, 0.40, 22, 1, true);
+      const pos = skirtGeo.attributes.position;
+      for (let i = 0; i < pos.count; i++) {
+        const yVal = pos.getY(i);
+        const angle = Math.atan2(pos.getZ(i), pos.getX(i));
+        const pleat = Math.sin(angle * 16) * 0.016 * (0.20 - yVal);
+        pos.setX(i, pos.getX(i) + Math.cos(angle) * pleat);
+        pos.setZ(i, pos.getZ(i) + Math.sin(angle) * pleat);
+      }
+      skirtGeo.computeVertexNormals();
+      const skirtMesh = new THREE.Mesh(skirtGeo, bottomMat);
+      skirtMesh.position.set(0, -0.15, 0.0);
+      bottomGarment.add(skirtMesh);
+    }
+
+    bones.Hips.add(bottomGarment);
+  }
+
+  // Bolsillos o dobladillos en muslos (cargo / bermuda)
+  if (profile.bottomStyle === 'cargo') {
+    const pocketGeo = new THREE.BoxGeometry(0.045, 0.12, 0.11);
+    const flapGeo = new THREE.BoxGeometry(0.05, 0.032, 0.115);
+
+    if (bones.LeftUpLeg) {
+      const leftP = new THREE.Group();
+      leftP.name = 'sims2_leg_pocket_left';
+      const p1 = new THREE.Mesh(pocketGeo, bottomMat);
+      const f1 = new THREE.Mesh(flapGeo, bottomMat);
+      f1.position.y = 0.065;
+      leftP.position.set(0.115, -0.15, 0.02);
+      leftP.add(p1, f1);
+      bones.LeftUpLeg.add(leftP);
+    }
+    if (bones.RightUpLeg) {
+      const rightP = new THREE.Group();
+      rightP.name = 'sims2_leg_pocket_right';
+      const p2 = new THREE.Mesh(pocketGeo, bottomMat);
+      const f2 = new THREE.Mesh(flapGeo, bottomMat);
+      f2.position.y = 0.065;
+      rightP.position.set(-0.115, -0.15, 0.02);
+      rightP.add(p2, f2);
+      bones.RightUpLeg.add(rightP);
+    }
+  } else if (profile.bottomStyle === 'bermuda') {
+    const cuffGeo = new THREE.CylinderGeometry(0.112, 0.115, 0.038, 16, 1, true);
+    if (bones.LeftUpLeg) {
+      const cuffL = new THREE.Mesh(cuffGeo, bottomMat);
+      cuffL.name = 'sims2_leg_pocket_left';
+      cuffL.position.set(0, -0.21, 0);
+      bones.LeftUpLeg.add(cuffL);
+    }
+    if (bones.RightUpLeg) {
+      const cuffR = new THREE.Mesh(cuffGeo, bottomMat);
+      cuffR.name = 'sims2_leg_pocket_right';
+      cuffR.position.set(0, -0.21, 0);
+      bones.RightUpLeg.add(cuffR);
+    }
+  }
+}
+
+/**
+ * Construye o actualiza accesorios 3D reales acoplados a los huesos del avatar (relojes, gorras, lentes, pulseras, collares, aretes)
+ */
+export function syncSims2Accessories3D(actorGroup, profile) {
+  const bones = actorGroup.userData.bones;
+  if (!bones) return;
+
+  const acc = profile.accessories || {};
+
+  // 1. RELOJ (LeftForeArm)
+  if (bones.LeftForeArm) {
+    const oldWatch = bones.LeftForeArm.getObjectByName('sims2_acc_watch');
+    if (oldWatch) bones.LeftForeArm.remove(oldWatch);
+
+    if (acc.reloj && acc.reloj !== 'ninguno') {
+      const watch = new THREE.Group();
+      watch.name = 'sims2_acc_watch';
+      const isGold = acc.reloj === 'clasico_oro';
+      const isLeather = acc.reloj === 'cuero_ejecutivo';
+
+      const strapMat = new THREE.MeshStandardMaterial({
+        color: isGold ? '#eab308' : isLeather ? '#78350f' : '#0f172a',
+        metalness: isGold ? 0.9 : 0.1,
+        roughness: isGold ? 0.2 : 0.7
+      });
+      const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.044, 0.044, 0.032, 16, 1, true), strapMat);
+
+      const caseMat = new THREE.MeshStandardMaterial({
+        color: isGold ? '#facc15' : isLeather ? '#cbd5e1' : '#1e293b',
+        metalness: isGold || isLeather ? 0.92 : 0.4,
+        roughness: 0.25
+      });
+      const watchCase = new THREE.Mesh(
+        acc.reloj === 'deportivo_digital'
+          ? new THREE.BoxGeometry(0.030, 0.036, 0.014)
+          : new THREE.CylinderGeometry(0.017, 0.017, 0.012, 16),
+        caseMat
+      );
+      watchCase.rotation.y = Math.PI / 2;
+      watchCase.position.set(0.046, 0, 0);
+      watch.add(strap, watchCase);
+      watch.position.set(0, -0.185, 0.01);
+      bones.LeftForeArm.add(watch);
+    }
+  }
+
+  // 2. GORRA / SOMBRERO, LENTES Y ARETES (Head)
+  if (bones.Head) {
+    const oldHat = bones.Head.getObjectByName('sims2_acc_hat');
+    if (oldHat) bones.Head.remove(oldHat);
+
+    if (acc.gorra && acc.gorra !== 'ninguno') {
+      const hat = new THREE.Group();
+      hat.name = 'sims2_acc_hat';
+
+      if (acc.gorra === 'baseball') {
+        const capMat = new THREE.MeshStandardMaterial({ color: profile.topColor || '#1e3a8a', roughness: 0.7 });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.122, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.52), capMat);
+        dome.position.y = 0.078;
+        const visor = new THREE.Mesh(new THREE.BoxGeometry(0.145, 0.01, 0.125), capMat);
+        visor.position.set(0, 0.072, 0.135);
+        visor.rotation.x = -0.18;
+        hat.add(dome, visor);
+      } else if (acc.gorra === 'cofia_chef') {
+        const chefMat = new THREE.MeshStandardMaterial({ color: '#f8fafc', roughness: 0.65 });
+        const toque = new THREE.Mesh(new THREE.CylinderGeometry(0.145, 0.118, 0.21, 18), chefMat);
+        toque.position.y = 0.20;
+        hat.add(toque);
+      } else if (acc.gorra === 'visera') {
+        const visorMat = new THREE.MeshStandardMaterial({ color: '#0ea5e9', roughness: 0.6 });
+        const band = new THREE.Mesh(new THREE.CylinderGeometry(0.120, 0.120, 0.032, 18, 1, true), visorMat);
+        band.position.y = 0.078;
+        const brim = new THREE.Mesh(new THREE.BoxGeometry(0.155, 0.01, 0.135), visorMat);
+        brim.position.set(0, 0.072, 0.145);
+        brim.rotation.x = -0.20;
+        hat.add(band, brim);
+      }
+      hat.position.set(0, 0.02, 0);
+      bones.Head.add(hat);
+    }
+
+    const oldGlasses = bones.Head.getObjectByName('sims2_acc_glasses');
+    if (oldGlasses) bones.Head.remove(oldGlasses);
+
+    if (acc.lentes && acc.lentes !== 'ninguno') {
+      const glasses = new THREE.Group();
+      glasses.name = 'sims2_acc_glasses';
+
+      const isAviator = acc.lentes === 'aviador_metalico';
+      const isSafety = acc.lentes === 'seguridad_industrial';
+      const frameMat = new THREE.MeshStandardMaterial({
+        color: isAviator ? '#eab308' : isSafety ? '#0284c7' : '#0f172a',
+        metalness: isAviator ? 0.9 : 0.1,
+        roughness: 0.3
+      });
+      const glassMat = new THREE.MeshStandardMaterial({
+        color: isAviator ? '#475569' : '#e0f2fe',
+        transparent: true,
+        opacity: isAviator ? 0.65 : 0.35,
+        roughness: 0.1
+      });
+
+      const lFrame = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.004, 8, 16), frameMat);
+      lFrame.position.set(-0.040, 0.065, 0.116);
+      const rFrame = new THREE.Mesh(new THREE.TorusGeometry(0.025, 0.004, 8, 16), frameMat);
+      rFrame.position.set(0.040, 0.065, 0.116);
+
+      const bridge = new THREE.Mesh(new THREE.CylinderGeometry(0.003, 0.003, 0.034), frameMat);
+      bridge.rotation.z = Math.PI / 2;
+      bridge.position.set(0, 0.069, 0.116);
+
+      const lGlass = new THREE.Mesh(new THREE.CircleGeometry(0.023, 16), glassMat);
+      lGlass.position.set(-0.040, 0.065, 0.115);
+      const rGlass = new THREE.Mesh(new THREE.CircleGeometry(0.023, 16), glassMat);
+      rGlass.position.set(0.040, 0.065, 0.115);
+
+      glasses.add(lFrame, rFrame, bridge, lGlass, rGlass);
+      bones.Head.add(glasses);
+    }
+
+    const oldEarrings = bones.Head.getObjectByName('sims2_acc_earrings');
+    if (oldEarrings) bones.Head.remove(oldEarrings);
+
+    if (acc.aretes && acc.aretes !== 'ninguno') {
+      const earrings = new THREE.Group();
+      earrings.name = 'sims2_acc_earrings';
+
+      const isGold = acc.aretes === 'arracadas_oro';
+      const isPearl = acc.aretes === 'broquel_perla';
+      const earMat = new THREE.MeshStandardMaterial({
+        color: isGold ? '#facc15' : isPearl ? '#ffffff' : '#e2e8f0',
+        metalness: isPearl ? 0.2 : 0.9,
+        roughness: isPearl ? 0.1 : 0.25
+      });
+
+      if (isPearl) {
+        const pL = new THREE.Mesh(new THREE.SphereGeometry(0.008, 12, 12), earMat);
+        pL.position.set(-0.096, 0.042, 0.015);
+        const pR = new THREE.Mesh(new THREE.SphereGeometry(0.008, 12, 12), earMat);
+        pR.position.set(0.096, 0.042, 0.015);
+        earrings.add(pL, pR);
+      } else {
+        const hL = new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.003, 8, 14), earMat);
+        hL.position.set(-0.096, 0.035, 0.015);
+        const hR = new THREE.Mesh(new THREE.TorusGeometry(0.013, 0.003, 8, 14), earMat);
+        hR.position.set(0.096, 0.035, 0.015);
+        earrings.add(hL, hR);
+      }
+      bones.Head.add(earrings);
+    }
+  }
+
+  // 3. PULSERA (RightForeArm)
+  if (bones.RightForeArm) {
+    const oldBracelet = bones.RightForeArm.getObjectByName('sims2_acc_bracelet');
+    if (oldBracelet) bones.RightForeArm.remove(oldBracelet);
+
+    if (acc.pulsera && acc.pulsera !== 'ninguno') {
+      const bracelet = new THREE.Group();
+      bracelet.name = 'sims2_acc_bracelet';
+
+      const isSilver = acc.pulsera === 'plata_fina';
+      const isWood = acc.pulsera === 'cuentas_madera';
+      const bMat = new THREE.MeshStandardMaterial({
+        color: isSilver ? '#e2e8f0' : isWood ? '#78350f' : '#3f2212',
+        metalness: isSilver ? 0.9 : 0.05,
+        roughness: isSilver ? 0.2 : 0.8
+      });
+      const bRing = new THREE.Mesh(new THREE.TorusGeometry(0.045, 0.006, 8, 16), bMat);
+      bRing.rotation.x = Math.PI / 2;
+      bracelet.add(bRing);
+      bracelet.position.set(0, -0.185, 0.01);
+      bones.RightForeArm.add(bracelet);
+    }
+  }
+
+  // 4. COLLAR (Neck)
+  if (bones.Neck) {
+    const oldNecklace = bones.Neck.getObjectByName('sims2_acc_necklace');
+    if (oldNecklace) bones.Neck.remove(oldNecklace);
+
+    if (acc.collar && acc.collar !== 'ninguno') {
+      const necklace = new THREE.Group();
+      necklace.name = 'sims2_acc_necklace';
+
+      const isGold = acc.collar === 'cadena_oro';
+      const isChoker = acc.collar === 'gargantilla';
+      const nMat = new THREE.MeshStandardMaterial({
+        color: isGold ? '#facc15' : isChoker ? '#0f172a' : '#cbd5e1',
+        metalness: isChoker ? 0.1 : 0.92,
+        roughness: isChoker ? 0.8 : 0.22
+      });
+
+      const chain = new THREE.Mesh(
+        new THREE.TorusGeometry(0.106, isChoker ? 0.009 : 0.004, 8, 22),
+        nMat
+      );
+      chain.rotation.x = Math.PI / 2;
+      necklace.add(chain);
+
+      if (acc.collar === 'dije_plata') {
+        const pendantMat = new THREE.MeshStandardMaterial({ color: '#38bdf8', metalness: 0.9, roughness: 0.1 });
+        const pendant = new THREE.Mesh(new THREE.OctahedronGeometry(0.014), pendantMat);
+        pendant.position.set(0, -0.02, 0.108);
+        necklace.add(pendant);
+      }
+      necklace.position.set(0, 0.04, 0);
+      bones.Neck.add(necklace);
+    }
+  }
+}
+
+/**
  * Aplica todas las medidas exactas (estatura, peso, hombro, busto, cintura, cadera),
- * morfotipo Fits/Fats, 27 sliders faciales, estilo de cabello y tintado PBR sobre el actor clonado.
+ * morfotipo Fits/Fats, medidas musculares avanzadas, etnicidades de rostro, prendas 3D y accesorios sobre el actor clonado.
  */
 export function applySims2ProfileToGroup(actorGroup, profile) {
   if (!actorGroup || !profile) return;
@@ -950,6 +1792,18 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
   const morphWaist = THREE.MathUtils.clamp(((profile.waistCm ?? baseWaist) - baseWaist) / 18, -0.6, 1.2);
   const morphHips = THREE.MathUtils.clamp(((profile.hipCm ?? baseHip) - baseHip) / 16, -0.5, 1.2);
 
+  const cupFactor =
+    profile.bustCup === 'A' ? 0.0 :
+    profile.bustCup === 'B' ? 0.35 :
+    profile.bustCup === 'C' ? 0.70 :
+    profile.bustCup === 'D' ? 1.05 :
+    profile.bustCup === 'DD' ? 1.40 : 0.65;
+
+  const bustShape = profile.bustShape || 'semi_esfera';
+  const gluteShape = profile.glutesShape || 'redondo';
+  const ethnicity = profile.ethnicity || 'latino';
+  const browShape = profile.browShape || 'arqueadas';
+
   const fs = { ...DEFAULT_FACE_SLIDERS, ...(profile.faceSliders || {}) };
   const morphValues = {
     sims2_fatness: rawFat,
@@ -958,13 +1812,44 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
     sims2_bust: morphBust,
     sims2_waist: morphWaist,
     sims2_hips: morphHips,
+    // Nuevas medidas musculares y anatómicas corporales:
+    sims2_biceps: THREE.MathUtils.clamp(profile.biceps ?? (rawFit * 0.5), -0.5, 1.3),
+    sims2_forearms: THREE.MathUtils.clamp(profile.forearms ?? (rawFit * 0.4), -0.5, 1.3),
+    sims2_quads: THREE.MathUtils.clamp(profile.quads ?? (rawFit * 0.5), -0.5, 1.4),
+    sims2_calves: THREE.MathUtils.clamp(profile.calves ?? (rawFit * 0.4), -0.5, 1.3),
+    sims2_abdomen_muscle: THREE.MathUtils.clamp(profile.abdomenMuscle ?? (rawFit * 0.65), 0, 1.3),
+    // Glúteos avanzados
+    sims2_glutes_volume: THREE.MathUtils.clamp(profile.glutesVolume ?? (morphHips * 0.6 + rawFat * 0.4), 0, 1.5),
+    sims2_glutes_fat: THREE.MathUtils.clamp(profile.glutesFat ?? (rawFat * 0.7), 0, 1.4),
+    sims2_glutes_muscle: THREE.MathUtils.clamp(profile.glutesMuscle ?? (rawFit * 0.7), 0, 1.4),
+    sims2_glutes_roundness: THREE.MathUtils.clamp(profile.glutesRoundness ?? 0.6, 0, 1.4),
+    sims2_glutes_corazon: gluteShape === 'corazon' ? 1.0 : 0,
+    sims2_glutes_bubblebutt: gluteShape === 'bubblebutt' ? 1.15 : 0,
+    sims2_glutes_gota: gluteShape === 'gota' ? 1.0 : 0,
+    sims2_glutes_redondo: gluteShape === 'redondo' ? 1.0 : 0,
+    // Busto avanzado
+    sims2_bust_cup: cupFactor,
+    sims2_bust_pera: bustShape === 'pera' ? 1.0 : 0,
+    sims2_bust_pico: bustShape === 'pico' ? 1.0 : 0,
+    sims2_bust_esfera: bustShape === 'esfera' ? 1.0 : 0,
+    sims2_bust_semi_esfera: bustShape === 'semi_esfera' ? 1.0 : 0,
+    // Etnicidades de rostro
+    face_ethnic_caucasica: ethnicity === 'caucasica' ? 1.0 : 0,
+    face_ethnic_africano: ethnicity === 'africano' ? 1.0 : 0,
+    face_ethnic_latino: ethnicity === 'latino' ? 1.0 : 0,
+    face_ethnic_medio_oriente: ethnicity === 'medio_oriente' ? 1.0 : 0,
+    face_ethnic_asiatico: ethnicity === 'asiatico' ? 1.0 : 0,
+    // Cejas
+    face_brow_arch: browShape === 'arqueadas' ? 1.0 : 0,
+    face_brow_straight: browShape === 'rectas' ? 1.0 : 0,
+    face_brow_angular: browShape === 'angulares' ? 1.0 : 0,
     face_jaw_width: THREE.MathUtils.clamp(fs.jawWidth * 0.8 + fs.faceWidth * 0.4, -1, 1),
     face_cheek_width: THREE.MathUtils.clamp(fs.cheekboneWidth * 0.85 + fs.faceWidth * 0.4, -1, 1),
     face_chin_length: THREE.MathUtils.clamp(fs.chinLength, -1, 1),
     face_forehead_width: THREE.MathUtils.clamp(fs.foreheadSlope * 0.8 + fs.faceWidth * 0.35, -1, 1),
     face_nose_bridge: THREE.MathUtils.clamp(fs.noseBridgeCurve * 0.7 + fs.noseLength * 0.5, -1, 1),
     // Mapeo a morph targets ARKit nativos de Wolf3D_Head
-    browInnerUp: Math.max(0, fs.browHeight * 0.55 + fs.browThickness * 0.35),
+    browInnerUp: Math.max(0, fs.browHeight * 0.55 + (profile.browThickness ?? fs.browThickness) * 0.35),
     browDownLeft: Math.max(0, -fs.browHeight * 0.5 + fs.browTilt * 0.4),
     browDownRight: Math.max(0, -fs.browHeight * 0.5 - fs.browTilt * 0.4),
     browOuterUpLeft: Math.max(0, fs.browCurve * 0.6),
@@ -1024,10 +1909,24 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
       mat.map = getTintedCanvasTexture(origImg, profile.hairColor || '#1e1b18', 'hair', 'hair');
       mat.needsUpdate = true;
     } else if (obj.name.includes('Outfit_Top')) {
-      mat.map = getTintedCanvasTexture(origImg, profile.topColor || '#3b82f6', 'top', profile.topStyle || 'polo');
+      mat.map = getTintedCanvasTexture(
+        origImg,
+        profile.topColor || '#3b82f6',
+        'top',
+        profile.topStyle || 'polo',
+        profile.topFabric || 'algodon'
+      );
+      mat.roughness = profile.topFabric === 'seda' ? 0.28 : 0.65;
       mat.needsUpdate = true;
     } else if (obj.name.includes('Outfit_Bottom')) {
-      mat.map = getTintedCanvasTexture(origImg, profile.bottomColor || '#1e293b', 'bottom', profile.bottomStyle || 'jeans');
+      mat.map = getTintedCanvasTexture(
+        origImg,
+        profile.bottomColor || '#1e293b',
+        'bottom',
+        profile.bottomStyle || 'jeans',
+        profile.bottomFabric || 'mezclilla'
+      );
+      mat.roughness = profile.bottomFabric === 'seda' ? 0.30 : 0.70;
       mat.needsUpdate = true;
     } else if (obj.name.includes('Footwear')) {
       mat.map = getTintedCanvasTexture(origImg, profile.shoeColor || '#0f172a', 'shoe', 'shoe');
@@ -1066,6 +1965,12 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
       customHairMesh.visible = false;
     }
   }
+
+  // 5. Acoplar y sincronizar prendas 3D reales (filipina, polo, camisa, hoodie, mandil, cargo, falda)
+  syncSims2Garments3D(actorGroup, profile);
+
+  // 6. Acoplar y sincronizar accesorios 3D reales (relojes, gorras, lentes, pulseras, collares, aretes)
+  syncSims2Accessories3D(actorGroup, profile);
 }
 
 /**
