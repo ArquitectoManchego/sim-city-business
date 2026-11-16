@@ -538,11 +538,11 @@ export default function Sims2CASModal() {
                     </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {[
-                        { key: 'biceps', label: 'Bíceps (Brazos)', min: -0.5, max: 1.2, step: 0.05, def: 0.2 },
-                        { key: 'forearms', label: 'Antebrazos', min: -0.5, max: 1.2, step: 0.05, def: 0.15 },
-                        { key: 'quads', label: 'Cuádriceps (Muslos)', min: -0.5, max: 1.2, step: 0.05, def: 0.25 },
-                        { key: 'calves', label: 'Chamorros / Gemelos', min: -0.5, max: 1.2, step: 0.05, def: 0.15 },
-                        { key: 'abdomenMuscle', label: 'Definición Abdomen', min: 0.0, max: 1.2, step: 0.05, def: 0.35 }
+                        { key: 'biceps', label: 'Bíceps (Brazos)', min: -0.5, max: 1.2, step: 0.05, def: 0.12 },
+                        { key: 'forearms', label: 'Antebrazos', min: -0.5, max: 1.2, step: 0.05, def: 0.08 },
+                        { key: 'quads', label: 'Cuádriceps (Muslos)', min: -0.5, max: 1.2, step: 0.05, def: 0.12 },
+                        { key: 'calves', label: 'Chamorros / Gemelos', min: -0.5, max: 1.2, step: 0.05, def: 0.08 },
+                        { key: 'abdomenMuscle', label: 'Definición Abdomen', min: 0.0, max: 1.2, step: 0.05, def: 0.18 }
                       ].map((sl) => {
                         const val = profile[sl.key] ?? sl.def;
                         return (
@@ -591,10 +591,10 @@ export default function Sims2CASModal() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                       {[
-                        { key: 'glutesVolume', label: 'Volumen General Glúteos', min: 0.0, max: 1.5, step: 0.05, def: 0.35 },
-                        { key: 'glutesFat', label: 'Volumen Grasa en Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.15 },
-                        { key: 'glutesMuscle', label: 'Volumen Músculo en Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.35 },
-                        { key: 'glutesRoundness', label: 'Redondez de Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.65 }
+                        { key: 'glutesVolume', label: 'Volumen General Glúteos', min: 0.0, max: 1.5, step: 0.05, def: 0.18 },
+                        { key: 'glutesFat', label: 'Volumen Grasa en Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.08 },
+                        { key: 'glutesMuscle', label: 'Volumen Músculo en Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.18 },
+                        { key: 'glutesRoundness', label: 'Redondez de Glúteos', min: 0.0, max: 1.2, step: 0.05, def: 0.35 }
                       ].map((sl) => {
                         const val = profile[sl.key] ?? sl.def;
                         return (
