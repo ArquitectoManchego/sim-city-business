@@ -4,7 +4,7 @@
  * 2. Panel "Log de Simulación y Stats en Vivo" (minimizable con flecha hacia botón).
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Terminal,
   UserPlus,
@@ -16,6 +16,50 @@ import { useGameStore, NEGOCIOS_ACTIVOS_IDS } from '../../store/useGameStore.js'
 import { NEGOCIOS_ZONES_3D } from '../../engine/ChoreographyRegistry.js';
 import { PRODUCTOS_OPERATIVOS_EXTENDIDOS } from '../../shared/catalogoProductosInsumos.js';
 import GeniePanel from '../ui/GeniePanel.jsx';
+
+function seleccionarProductosRapidos(lista = [], max = 10) {
+  if (lista.length <= max) return lista;
+  const seleccionados = [];
+  const usados = new Set();
+  const categoriasVistas = new Set();
+  const racksVistos = new Set();
+
+  // 1. Priorizar variedad por categoría / mueble (ideal para catálogos grandes como ImperiArte)
+  for (const prod of lista) {
+    if (seleccionados.length >= max) break;
+    const cat = prod.categoria || prod.tipoOperacion || 'general';
+    const rack = prod.rackKey || prod.linea || prod.id;
+    if (!categoriasVistas.has(cat) || !racksVistos.has(rack)) {
+      seleccionados.push(prod);
+      usados.add(prod.id);
+      categoriasVistas.add(cat);
+      racksVistos.add(rack);
+    }
+  }
+
+  // 2. Completar hasta max con distribución uniforme sobre el resto del catálogo
+  if (seleccionados.length < max) {
+    const paso = Math.max(1, Math.floor(lista.length / max));
+    for (let i = 0; i < lista.length && seleccionados.length < max; i += paso) {
+      const prod = lista[i];
+      if (!usados.has(prod.id)) {
+        seleccionados.push(prod);
+        usados.add(prod.id);
+      }
+    }
+  }
+
+  // 3. Relleno final si aún faltan
+  for (const prod of lista) {
+    if (seleccionados.length >= max) break;
+    if (!usados.has(prod.id)) {
+      seleccionados.push(prod);
+      usados.add(prod.id);
+    }
+  }
+
+  return seleccionados;
+}
 
 export default function LiveStatsTickerLog() {
   const liveLogs = useGameStore((s) => s.liveLogs);
@@ -38,7 +82,10 @@ export default function LiveStatsTickerLog() {
   const activeNegForButtons = NEGOCIOS_ZONES_3D[focusedNegocioId]
     ? focusedNegocioId
     : 'hawaiian_paradise';
-  const productosRapidos = PRODUCTOS_OPERATIVOS_EXTENDIDOS[activeNegForButtons] || [];
+  const productosRapidos = useMemo(
+    () => seleccionarProductosRapidos(PRODUCTOS_OPERATIVOS_EXTENDIDOS[activeNegForButtons] || [], 10),
+    [activeNegForButtons]
+  );
   const empleadosActivos = empleadosListaPorNegocio?.[activeNegForButtons] || [];
 
   const logsFiltrados =
