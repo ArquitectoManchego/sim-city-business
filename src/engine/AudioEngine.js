@@ -579,12 +579,21 @@ class SimAudioEngine {
 
   /**
    * Sincroniza en tiempo real todos los sonidos del local enfocado por la cámara.
+   * Los sonidos de otros locales quedan estrictamente silenciados.
    */
   updateFromSimulation(nowSec, focusedNegocioId, gameState, trainingState) {
     this.tickBackgroundMusic(nowSec);
     if (!gameState) return;
 
-    this.liveAudioState.focusedNegocioId = focusedNegocioId;
+    if (this.liveAudioState.focusedNegocioId !== focusedNegocioId) {
+      this.liveAudioState.activeSounds = [];
+      this.liveAudioState.focusedNegocioId = focusedNegocioId;
+    }
+
+    if (!focusedNegocioId || focusedNegocioId === 'ALL_CONSORCIO') {
+      this.liveAudioState.activeSounds = [];
+      return;
+    }
 
     // 1. Detectar entrada de nuevos clientes en locales públicos -> Campanita de puerta
     ['hawaiian_paradise', 'imperia_uniformes', 'papeleria_imperiarte'].forEach((negId) => {
@@ -596,20 +605,21 @@ class SimAudioEngine {
       this.prevClientCountByNeg[negId] = len;
     });
 
-    // 2. Detectar apertura/cierre de plancha de calor (pi_plancha_plana) -> Rechinido real
-    const flatPressRuntime = gameState.equiposRuntime?.pi_plancha_plana;
-    const isFlatPressWorking = Boolean(
-      flatPressRuntime?.encendido ||
-        (trainingState?.isTrainingMode && trainingState?.selectedNegocioId === 'publi_impresos')
-    );
-    if (
-      this.lastFlatPressOpenState.pi_plancha_plana !== undefined &&
-      this.lastFlatPressOpenState.pi_plancha_plana !== isFlatPressWorking &&
-      focusedNegocioId === 'publi_impresos'
-    ) {
-      this.playHeatPressCreak(isFlatPressWorking);
+    // 2. Detectar apertura/cierre de plancha de calor (pi_plancha_plana) -> Rechinido real (solo en publi_impresos)
+    if (focusedNegocioId === 'publi_impresos') {
+      const flatPressRuntime = gameState.equiposRuntime?.pi_plancha_plana;
+      const isFlatPressWorking = Boolean(
+        flatPressRuntime?.encendido ||
+          (trainingState?.isTrainingMode && trainingState?.selectedNegocioId === 'publi_impresos')
+      );
+      if (
+        this.lastFlatPressOpenState.pi_plancha_plana !== undefined &&
+        this.lastFlatPressOpenState.pi_plancha_plana !== isFlatPressWorking
+      ) {
+        this.playHeatPressCreak(isFlatPressWorking);
+      }
+      this.lastFlatPressOpenState.pi_plancha_plana = isFlatPressWorking;
     }
-    this.lastFlatPressOpenState.pi_plancha_plana = isFlatPressWorking;
 
     // 3. Evaluar sonidos activos cada ~170ms en el negocio enfocado
     if (nowSec - this.lastMachineTickTime < 0.17) return;

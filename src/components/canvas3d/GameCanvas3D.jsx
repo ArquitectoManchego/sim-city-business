@@ -104,6 +104,52 @@ function lerpAngle(current, target, alpha) {
 }
 
 /**
+ * Desolapamiento estilo tira cómica para globos de diálogo (vendedor vs cliente, etc.)
+ * Cuando dos globos coinciden espacialmente en pantalla, se separan verticalmente (uno arriba y otro abajo)
+ * garantizando que nunca se superpongan ni se tapen entre sí.
+ */
+function resolveComicDialogueStacking(labels) {
+  if (!labels || labels.length <= 1) return labels;
+  const MARGIN_X = 220; // Ancho aproximado del globo
+  const MIN_VERTICAL_GAP = 76; // Altura mínima entre globos para evitar superposición
+
+  const resolved = labels.map((l) => ({ ...l, offsetY: 0, offsetX: 0 }));
+
+  for (let i = 0; i < resolved.length; i++) {
+    for (let j = i + 1; j < resolved.length; j++) {
+      const a = resolved[i];
+      const b = resolved[j];
+      const dx = (a.x + a.offsetX) - (b.x + b.offsetX);
+      const totalY_A = a.y + a.offsetY;
+      const totalY_B = b.y + b.offsetY;
+      const dy = Math.abs(totalY_A - totalY_B);
+
+      if (Math.abs(dx) < MARGIN_X && dy < MIN_VERTICAL_GAP) {
+        const overlap = MIN_VERTICAL_GAP - dy;
+        const pushDistance = (overlap / 2) + 8;
+        // En una tira cómica: el vendedor/empleado va arriba y el cliente abajo (o viceversa)
+        if (!a.isClient && b.isClient) {
+          a.offsetY -= pushDistance;
+          b.offsetY += pushDistance;
+        } else if (a.isClient && !b.isClient) {
+          b.offsetY -= pushDistance;
+          a.offsetY += pushDistance;
+        } else {
+          if (totalY_A <= totalY_B) {
+            a.offsetY -= pushDistance;
+            b.offsetY += pushDistance;
+          } else {
+            a.offsetY += pushDistance;
+            b.offsetY -= pushDistance;
+          }
+        }
+      }
+    }
+  }
+  return resolved;
+}
+
+/**
  * Construye estanterías de exhibición para las 6 ramas de Imperia Uniformes, rack de pedidos listos y mostrador de maniquíes
  */
 function buildImperiaFixtures3D(localGroup, wps) {
@@ -289,6 +335,8 @@ export default function GameCanvas3D() {
   const actorGroupsRef = useRef({ employees: {}, customers: {}, gerente: null, familia: {} });
   const defaultSims2Ref = useRef(createDefaultSims2Profiles());
   const machineGroupsRef = useRef({});
+  const businessGroupsRef = useRef({});
+  const businessAlphasRef = useRef({});
   const meterDiscsRef = useRef({});
   const collisionGroupRef = useRef(null);
   const navMeshGroupRef = useRef(null);
@@ -307,6 +355,7 @@ export default function GameCanvas3D() {
   const [overlayLabels, setOverlayLabels] = useState([]);
   const [overlayCashPopups, setOverlayCashPopups] = useState([]);
   const [overlayApplianceTelemetry, setOverlayApplianceTelemetry] = useState([]);
+  const [hoveredTelemetryKey, setHoveredTelemetryKey] = useState(null);
 
   const focusedNegocioId = useGameStore((s) => s.focusedNegocioId);
   const focusedMedidorId = useGameStore((s) => s.focusedMedidorId);
@@ -403,6 +452,9 @@ export default function GameCanvas3D() {
       const localGroup = new THREE.Group();
       localGroup.position.set(cx, 0, cz);
       scene.add(localGroup);
+      businessGroupsRef.current[negId] = localGroup;
+      const isInitialActive = negId === (focusedNegocioId || 'hawaiian_paradise');
+      businessAlphasRef.current[negId] = isInitialActive ? 1.0 : 0.0;
 
       // PISO CAMINABLE DEL LOCAL (FLOOR)
       const floorMesh = new THREE.Mesh(
@@ -710,6 +762,33 @@ export default function GameCanvas3D() {
       }
     };
     renderer.domElement.addEventListener('pointerdown', handleCanvasClick);
+
+    // Detección 3D por raycast al hacer hover con el ratón sobre cualquier equipo eléctrico
+    const hoverRaycaster = new THREE.Raycaster();
+    const hoverMouse = new THREE.Vector2();
+
+    const handlePointerMove = (ev) => {
+      const rect = renderer.domElement.getBoundingClientRect();
+      hoverMouse.x = ((ev.clientX - rect.left) / rect.width) * 2 - 1;
+      hoverMouse.y = -((ev.clientY - rect.top) / rect.height) * 2 + 1;
+      hoverRaycaster.setFromCamera(hoverMouse, camera);
+
+      let foundEq = null;
+      const keys = Object.keys(machineGroupsRef.current);
+      for (const k of keys) {
+        const mGrp = machineGroupsRef.current[k];
+        if (!mGrp || !mGrp.visible) continue;
+        const intersects = hoverRaycaster.intersectObjects(mGrp.children, true);
+        if (intersects.length > 0) {
+          foundEq = k;
+          break;
+        }
+      }
+      if (foundEq) {
+        setHoveredTelemetryKey(foundEq);
+      }
+    };
+    renderer.domElement.addEventListener('pointermove', handlePointerMove);
 
     // Loop de animación 60 FPS (Avanza tanto el juego como el Modo Entrenamiento y proyecta etiquetas 2D)
     let animFrameId = null;
@@ -1106,21 +1185,128 @@ export default function GameCanvas3D() {
         }
       }
 
+      // Transición suave de transparencia (alpha fade) para mostrar sólo el local actualmente enfocado
+      const activeFocusedNegId =
+        (freshTrain.isTrainingMode && freshTrain.selectedNegocioId) ||
+        freshGame.focusedNegocioId ||
+        'hawaiian_paradise';
+      const isAllConsorcio = freshGame.focusedNegocioId === 'ALL_CONSORCIO';
+
+      Object.keys(ALL_ZONES_3D).forEach((negId) => {
+        const group = businessGroupsRef.current[negId];
+        if (!group) return;
+
+        const targetAlpha = isAllConsorcio || negId === activeFocusedNegId ? 1.0 : 0.0;
+        const currentAlpha = businessAlphasRef.current[negId] ?? targetAlpha;
+        const nextAlpha = THREE.MathUtils.lerp(currentAlpha, targetAlpha, Math.min(1.0, dt * 5.5));
+        const alpha = Math.abs(nextAlpha - targetAlpha) < 0.003 ? targetAlpha : nextAlpha;
+        businessAlphasRef.current[negId] = alpha;
+
+        // Ocultar / transparentar geometría del local
+        if (alpha <= 0.001) {
+          group.visible = false;
+        } else {
+          group.visible = true;
+          group.traverse((obj) => {
+            if (obj.isMesh && obj.material) {
+              const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+              mats.forEach((m) => {
+                if (m.userData.baseOpacity === undefined) {
+                  m.userData.baseOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                }
+                if (alpha >= 0.999) {
+                  m.opacity = m.userData.baseOpacity;
+                  m.transparent = m.userData.baseOpacity < 0.999;
+                } else {
+                  m.transparent = true;
+                  m.opacity = m.userData.baseOpacity * alpha;
+                }
+              });
+            }
+          });
+        }
+
+        // Ocultar / transparentar empleados de este local
+        const empLista =
+          freshGame.empleadosListaPorNegocio?.[negId] ||
+          (freshGame.empleadosPorNegocio?.[negId] ? [freshGame.empleadosPorNegocio[negId]] : []);
+        empLista.forEach((emp) => {
+          const mesh = actorGroupsRef.current.employees[emp.id];
+          if (mesh) {
+            mesh.visible = alpha > 0.001;
+            if (mesh.visible) {
+              mesh.traverse((obj) => {
+                if (obj.isMesh && obj.material) {
+                  const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                  mats.forEach((m) => {
+                    if (m.userData.baseOpacity === undefined) {
+                      m.userData.baseOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                    }
+                    if (alpha >= 0.999) {
+                      m.opacity = m.userData.baseOpacity;
+                      m.transparent = m.userData.baseOpacity < 0.999;
+                    } else {
+                      m.transparent = true;
+                      m.opacity = m.userData.baseOpacity * alpha;
+                    }
+                  });
+                }
+              });
+            }
+          }
+        });
+
+        // Ocultar / transparentar clientes de este local
+        const clients = [
+          ...(freshGame.clientesColaPorNegocio[negId] || []),
+          ...(freshGame.clientesPostCompraPorNegocio[negId] || [])
+        ];
+        clients.forEach((c) => {
+          const mesh = actorGroupsRef.current.customers[c.id];
+          if (mesh) {
+            mesh.visible = alpha > 0.001;
+            if (mesh.visible) {
+              mesh.traverse((obj) => {
+                if (obj.isMesh && obj.material) {
+                  const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                  mats.forEach((m) => {
+                    if (m.userData.baseOpacity === undefined) {
+                      m.userData.baseOpacity = m.opacity !== undefined ? m.opacity : 1.0;
+                    }
+                    if (alpha >= 0.999) {
+                      m.opacity = m.userData.baseOpacity;
+                      m.transparent = m.userData.baseOpacity < 0.999;
+                    } else {
+                      m.transparent = true;
+                      m.opacity = m.userData.baseOpacity * alpha;
+                    }
+                  });
+                }
+              });
+            }
+          }
+        });
+      });
+
+      // Gerente General y Familia según visibilidad del local enfocado
+      if (actorGroupsRef.current.gerente) {
+        actorGroupsRef.current.gerente.visible =
+          isAllConsorcio || freshGame.gerenteState?.negocioActual === activeFocusedNegId;
+      }
+      if (famState?.visitActive && Array.isArray(famState.miembros)) {
+        famState.miembros.forEach((fam) => {
+          const famMesh = actorGroupsRef.current.familia[fam.sims2Id || fam.id];
+          if (famMesh) {
+            famMesh.visible = isAllConsorcio || famState.negocioDestino === activeFocusedNegId;
+          }
+        });
+      }
+
       controls.update();
       renderer.render(scene, camera);
 
-      // Actualizar motor de audio espacial (música BT, ambiente de tienda/cafetería/taller y sonido real de máquinas)
-      let nearestNegId = 'hawaiian_paradise';
-      let minNegDist = Infinity;
-      Object.entries(ALL_ZONES_3D).forEach(([zId, zInfo]) => {
-        if (!zInfo?.centro) return;
-        const d = Math.hypot(controls.target.x - zInfo.centro[0], controls.target.z - zInfo.centro[2]);
-        if (d < minNegDist) {
-          minNegDist = d;
-          nearestNegId = zId;
-        }
-      });
-      audioEngine.updateFromSimulation(nowSec, nearestNegId, freshGame, freshTrain);
+      // Actualizar motor de audio espacial (SOLO el local enfocado emite sonido de equipos y ambiente)
+      audioEngine.updateFromSimulation(nowSec, activeFocusedNegId, freshGame, freshTrain);
 
       // Actualizar etiquetas flotantes 2D proyectadas desde el mundo 3D cada ~80ms
       labelThrottle += dt;
@@ -1139,10 +1325,12 @@ export default function GameCanvas3D() {
           };
         };
 
-        // Etiquetas de empleados (1..4 por local) y clientes activos
+        // Etiquetas de empleados (1..4 por local) y clientes activos (solo del local visible)
         NEGOCIOS_ACTIVOS_IDS.forEach((negId) => {
           const zone = ALL_ZONES_3D[negId];
           if (!zone) return;
+          if ((businessAlphasRef.current[negId] || 0) < 0.05 && !isAllConsorcio) return;
+
           const empLista =
             freshGame.empleadosListaPorNegocio?.[negId] ||
             (freshGame.empleadosPorNegocio?.[negId] ? [freshGame.empleadosPorNegocio[negId]] : []);
@@ -1150,7 +1338,7 @@ export default function GameCanvas3D() {
           empLista.forEach((empData, empIdx) => {
             if (!empData) return;
             const empMesh = actorGroupsRef.current.employees[empData.id];
-            if (!empMesh) return;
+            if (!empMesh || !empMesh.visible) return;
             const profile = empMesh.userData.profile;
             const labelY = Math.max(1.85, ((profile?.heightCm || 170) / 100) + 0.30);
             const screenPos = projectToScreen(new THREE.Vector3(empMesh.position.x, labelY, empMesh.position.z));
@@ -1178,7 +1366,8 @@ export default function GameCanvas3D() {
                 badge: `${empData.nombre || `Emp ${empIdx + 1}`} · ${zone.nombre}`,
                 color: empData.enHorarioComida ? '#f59e0b' : zone.colorHex,
                 text: texto,
-                progress: subProgress
+                progress: subProgress,
+                isClient: false
               });
             }
           });
@@ -1186,7 +1375,7 @@ export default function GameCanvas3D() {
           // Globo de diálogo del cliente activo en este negocio
           const activeCli = freshGame.clientesColaPorNegocio[negId]?.[0];
           const cliMesh = activeCli ? actorGroupsRef.current.customers[activeCli.id] : null;
-          if (activeCli && cliMesh && activeCli.globoTexto) {
+          if (activeCli && cliMesh && cliMesh.visible && activeCli.globoTexto) {
             const cliScreen = projectToScreen(new THREE.Vector3(cliMesh.position.x, 1.95, cliMesh.position.z));
             if (cliScreen) {
               nextLabels.push({
@@ -1202,8 +1391,13 @@ export default function GameCanvas3D() {
           }
         });
 
-        // Etiqueta flotante del Gerente General
-        if (mgrData && actorGroupsRef.current.gerente) {
+        // Etiqueta flotante del Gerente General (solo si está en el local visible)
+        if (
+          mgrData &&
+          actorGroupsRef.current.gerente &&
+          actorGroupsRef.current.gerente.visible &&
+          (isAllConsorcio || freshGame.gerenteState?.negocioActual === activeFocusedNegId)
+        ) {
           const mgrMesh = actorGroupsRef.current.gerente;
           const mgrY = Math.max(2.05, ((mgrMesh.userData.profile?.heightCm || 175) / 100) + 0.56);
           const mgrScreen = projectToScreen(new THREE.Vector3(mgrMesh.position.x, mgrY, mgrMesh.position.z));
@@ -1214,17 +1408,22 @@ export default function GameCanvas3D() {
               y: mgrScreen.y,
               badge: '👑 Alex (Gerente General)',
               color: '#facc15',
-              text: mgrData.textoAccion
+              text: mgrData.textoAccion,
+              isClient: false
             });
           }
         }
 
-        // Etiquetas flotantes de la Familia cuando visitan Oficina o Hawaiian Paradise (3:00–4:00 PM)
-        if (famState?.visitActive && Array.isArray(famState.miembros)) {
+        // Etiquetas flotantes de la Familia (solo si están en el local visible)
+        if (
+          famState?.visitActive &&
+          Array.isArray(famState.miembros) &&
+          (isAllConsorcio || famState.negocioDestino === activeFocusedNegId)
+        ) {
           famState.miembros.forEach((fam) => {
             const famId = fam.sims2Id || fam.id;
             const famMesh = actorGroupsRef.current.familia[famId];
-            if (!famMesh || !fam.textoAccion) return;
+            if (!famMesh || !famMesh.visible || !fam.textoAccion) return;
             const famY = Math.max(1.55, ((famMesh.userData.profile?.heightCm || 150) / 100) + 0.42);
             const famScreen = projectToScreen(new THREE.Vector3(famMesh.position.x, famY, famMesh.position.z));
             if (famScreen) {
@@ -1241,9 +1440,10 @@ export default function GameCanvas3D() {
           });
         }
 
-        // Proyectar popups de pago en caja (+$50 estilo StarCraft SCV)
+        // Proyectar popups de pago en caja (+$50 estilo StarCraft SCV) solo del local visible
         const nextCash = [];
         (freshGame.cashPopups || []).forEach((cp) => {
+          if (!isAllConsorcio && cp.negocioId !== activeFocusedNegId) return;
           const zone = ALL_ZONES_3D[cp.negocioId];
           const wpMap = WAYPOINTS_POR_NEGOCIO[cp.negocioId];
           if (!zone || !wpMap) return;
@@ -1261,7 +1461,7 @@ export default function GameCanvas3D() {
           }
         });
 
-        // Proyectar ventanas flotantes de telemetría eléctrica junto a cada aparato en operación (incluye Oficina Consorcio)
+        // Proyectar telemetría eléctrica flotante junto a cada aparato en operación DEL LOCAL ACTUAL
         const nextTelemetry = [];
         const totalKwhMesConsorcio = Object.keys(ALL_ZONES_3D).reduce(
           (acc, id) => acc + (freshGame.statsPorNegocio[id]?.kwhMes ?? freshGame.statsPorNegocio[id]?.kwhAcumulados ?? 0),
@@ -1300,6 +1500,7 @@ export default function GameCanvas3D() {
               new THREE.Vector3(machineWorldPos.x + 0.55, machineWorldPos.y + 1.48, machineWorldPos.z)
             );
             if (screenPos && screenPos.x > -40 && screenPos.x < width + 40 && screenPos.y > -40 && screenPos.y < height + 40) {
+              const kwhDisplay = opKwh >= 0.01 ? `${opKwh.toFixed(2)} kWh` : `${opKwh.toFixed(3)} kWh`;
               nextTelemetry.push({
                 id: `tel_${eqKey}`,
                 eqKey,
@@ -1307,6 +1508,8 @@ export default function GameCanvas3D() {
                 watts: wattsNow,
                 elapsedSec: opSec,
                 costoMxn: opKwh * tarifaEfectivaKwh,
+                kwh: opKwh,
+                kwhDisplay: opKwh > 0 ? kwhDisplay : `${(wattsNow / 1000).toFixed(2)} kW`,
                 estado: curStep.estadoEquipo || 'WORK',
                 iceRemaining: eqKey === 'hp_raspadora' ? (eqMeta?.raspadosRestantesHielo ?? 10) : null,
                 iceMax: eqKey === 'hp_raspadora' ? (eqMeta?.maxRaspadosPorBloque ?? 10) : null,
@@ -1321,13 +1524,10 @@ export default function GameCanvas3D() {
             const eq = freshGame.equiposRuntime[eqKey];
             if (!meshGroup || !eq || eq.wattsActuales <= 0 || !eq.operacionActiva) return;
 
-            const isFocusedBusiness = freshGame.focusedNegocioId === eq.negocioId;
-            const shouldDisplay =
-              eq.rol === 'produccion' ||
-              eq.rol === 'turno_fijo' ||
-              eq.controlMode === 'MANUAL_ON' ||
-              isFocusedBusiness;
-            if (!shouldDisplay) return;
+            // SOLO mostrar telemetría del local actualmente enfocado
+            const isTargetBusiness = isAllConsorcio || eq.negocioId === activeFocusedNegId;
+            if (!isTargetBusiness) return;
+            if ((businessAlphasRef.current[eq.negocioId] || 0) < 0.05 && !isAllConsorcio) return;
 
             meshGroup.getWorldPosition(machineWorldPos);
             const yOffset = eq.rol === 'clima' || eqKey.includes('ac') ? 0.35 : 1.48;
@@ -1338,6 +1538,9 @@ export default function GameCanvas3D() {
               return;
             }
 
+            const opKwh = eq.kwhEnOperacionActual || ((eq.wattsActuales * (eq.segundosEnOperacionActual || 0)) / 3600) / 1000;
+            const kwhDisplay = opKwh >= 0.01 ? `${opKwh.toFixed(2)} kWh` : `${opKwh.toFixed(3)} kWh`;
+
             nextTelemetry.push({
               id: `tel_${eqKey}`,
               eqKey,
@@ -1345,6 +1548,8 @@ export default function GameCanvas3D() {
               watts: eq.wattsActuales,
               elapsedSec: eq.segundosEnOperacionActual || 0,
               costoMxn: (eq.kwhEnOperacionActual || 0) * tarifaEfectivaKwh,
+              kwh: opKwh,
+              kwhDisplay: opKwh > 0 ? kwhDisplay : `${(eq.wattsActuales / 1000).toFixed(2)} kW`,
               estado: eq.estado,
               iceRemaining: eqKey === 'hp_raspadora' ? (eq.raspadosRestantesHielo ?? 10) : null,
               iceMax: eqKey === 'hp_raspadora' ? (eq.maxRaspadosPorBloque ?? 10) : null,
@@ -1354,7 +1559,9 @@ export default function GameCanvas3D() {
           });
         }
 
-        setOverlayLabels(nextLabels);
+        // Aplicar apilado estilo tira cómica a los globos de diálogo (uno arriba y otro abajo, sin superponerse)
+        const comicStackedLabels = resolveComicDialogueStacking(nextLabels);
+        setOverlayLabels(comicStackedLabels);
         setOverlayCashPopups(nextCash);
         setOverlayApplianceTelemetry(nextTelemetry);
       }
@@ -1374,6 +1581,7 @@ export default function GameCanvas3D() {
       cancelAnimationFrame(animFrameId);
       window.removeEventListener('resize', handleResize);
       renderer.domElement.removeEventListener('pointerdown', handleCanvasClick);
+      renderer.domElement.removeEventListener('pointermove', handlePointerMove);
       Object.values(actorGroupsRef.current.employees).forEach((g) => {
         if (g) g.userData.disposed = true;
       });
@@ -1595,7 +1803,7 @@ export default function GameCanvas3D() {
           <div
             key={lbl.id}
             style={{
-              transform: `translate3d(${Math.round(lbl.x)}px, ${Math.round(lbl.y)}px, 0) translate(-50%, -100%)`
+              transform: `translate3d(${Math.round(lbl.x + (lbl.offsetX || 0))}px, ${Math.round(lbl.y + (lbl.offsetY || 0))}px, 0) translate(-50%, -100%)`
             }}
             className="absolute top-0 left-0 transition-transform duration-75"
           >
@@ -1641,17 +1849,40 @@ export default function GameCanvas3D() {
           </div>
         ))}
 
-        {/* Ventanas flotantes de telemetría junto a cada aparato eléctrico en funcionamiento */}
+        {/* Telemetría de equipos: puro texto flotante con kWh consumidos; al hacer hover se muestra el globo completo */}
         {overlayApplianceTelemetry.map((tel) => {
           const isPreheat = tel.estado === 'PREHEAT';
+          const isHovered = hoveredTelemetryKey === tel.eqKey;
+
+          if (!isHovered) {
+            // Puro texto flotante sin ningún globo, sin nombre, sin tiempo, sin $$$
+            return (
+              <div
+                key={tel.id}
+                data-testid={`appliance-telemetry-${tel.eqKey}`}
+                onMouseEnter={() => setHoveredTelemetryKey(tel.eqKey)}
+                style={{
+                  transform: `translate3d(${Math.round(tel.x)}px, ${Math.round(tel.y)}px, 0) translate(-50%, -50%)`,
+                  textShadow: '0 1px 3px rgba(0,0,0,0.98), 0 0 8px rgba(0,0,0,0.9)'
+                }}
+                className="absolute top-0 left-0 pointer-events-auto cursor-pointer select-none font-mono font-bold text-xs text-amber-300 hover:text-amber-200 transition-colors whitespace-nowrap bg-transparent border-0"
+                title="Pasar el cursor para ver detalles del equipo"
+              >
+                <span data-testid={`appliance-kwh-${tel.eqKey}`}>⚡ {tel.kwhDisplay}</span>
+              </div>
+            );
+          }
+
+          // Con hover: globo flotante detallado completo
           return (
             <div
               key={tel.id}
               data-testid={`appliance-telemetry-${tel.eqKey}`}
+              onMouseLeave={() => setHoveredTelemetryKey(null)}
               style={{
                 transform: `translate3d(${Math.round(tel.x)}px, ${Math.round(tel.y)}px, 0) translate(0%, -50%)`
               }}
-              className={`absolute top-0 left-0 pointer-events-none select-none transition-transform duration-75 px-2 py-1.5 rounded-lg border backdrop-blur-md shadow-xl min-w-[148px] text-[10px] leading-tight ${
+              className={`absolute top-0 left-0 pointer-events-auto select-none transition-transform duration-75 px-2 py-1.5 rounded-lg border backdrop-blur-md shadow-xl min-w-[148px] text-[10px] leading-tight ${
                 isPreheat
                   ? 'bg-slate-950/92 border-amber-400/75 text-amber-100'
                   : 'bg-slate-950/92 border-emerald-400/75 text-emerald-100'
