@@ -6,13 +6,21 @@ import { GLTFLoader, SkeletonUtils } from 'three-stdlib';
 // ============================================================================
 export const SIMS2_MODEL_PATHS = {
   male_casual: '/models/sims2/male_casual.glb',
-  male_base: '/models/sims2/male_base.glb',
+  male_base: '/models/avatar_engine/body_male_base.glb',
   female_casual: '/models/sims2/female_casual.glb',
-  female_base: '/models/sims2/female_base.glb',
+  female_base: '/models/avatar_engine/body_female_base.glb',
+  child_base: '/models/avatar_engine/body_child_base.glb',
   doctor_male: '/models/sims2/doctor_male.glb',
   doctor_female: '/models/sims2/doctor_female.glb',
   nurse_male: '/models/sims2/nurse_male.glb',
-  nurse_female: '/models/sims2/nurse_female.glb'
+  nurse_female: '/models/sims2/nurse_female.glb',
+  top_polo: '/models/avatar_engine/wardrobe/top_polo.glb',
+  top_scrub: '/models/avatar_engine/wardrobe/top_scrub.glb',
+  top_labcoat: '/models/avatar_engine/wardrobe/top_labcoat.glb',
+  bottom_scrub_pants: '/models/avatar_engine/wardrobe/bottom_scrub_pants.glb',
+  bottom_jeans: '/models/avatar_engine/wardrobe/bottom_jeans.glb',
+  bottom_bermuda: '/models/avatar_engine/wardrobe/bottom_bermuda.glb',
+  shoes_sneakers: '/models/avatar_engine/wardrobe/shoes_sneakers.glb'
 };
 
 export const SIMS2_SKIN_TONES = [
@@ -265,7 +273,7 @@ export function createDefaultSims2Profiles() {
       id: 'gerente',
       displayName: 'Alex (Gerente General)',
       roleTag: 'Gerente / Diseñador Principal',
-      baseModel: 'male_casual',
+      baseModel: 'male_base',
       gender: 'M',
       age: 42,
       heightCm: 176,
@@ -306,7 +314,7 @@ export function createDefaultSims2Profiles() {
       id: 'familia_esposa',
       displayName: 'Esposa (42 años)',
       roleTag: 'Esposa — Familia',
-      baseModel: 'female_casual',
+      baseModel: 'female_base',
       gender: 'F',
       age: 42,
       heightCm: 163,
@@ -347,7 +355,7 @@ export function createDefaultSims2Profiles() {
       id: 'familia_alex',
       displayName: 'Alex Jr. (12 años)',
       roleTag: 'Hijo 12 años — Familia',
-      baseModel: 'male_casual',
+      baseModel: 'child_base',
       gender: 'M',
       age: 12,
       heightCm: 148,
@@ -380,7 +388,7 @@ export function createDefaultSims2Profiles() {
       id: 'familia_barbara',
       displayName: 'Bárbara (8 años)',
       roleTag: 'Hija 8 años — Familia',
-      baseModel: 'female_casual',
+      baseModel: 'child_base',
       gender: 'F',
       age: 8,
       heightCm: 124,
@@ -418,7 +426,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_hawaiian_paradise_0',
       displayName: 'Barista Hawaiian #1',
       roleTag: 'Hawaiian Paradise',
-      baseModel: 'female_casual',
+      baseModel: 'female_base',
       gender: 'F',
       age: 24,
       heightCm: 164,
@@ -449,7 +457,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_imperia_uniformes_0',
       displayName: 'Asesora Mostrador Imperia #1',
       roleTag: 'Imperia Uniformes',
-      baseModel: 'female_casual',
+      baseModel: 'female_base',
       gender: 'F',
       age: 28,
       heightCm: 165,
@@ -480,7 +488,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_papeleria_imperiarte_0',
       displayName: 'Encargado Papelería #1',
       roleTag: 'Papelería Imperiarte',
-      baseModel: 'male_casual',
+      baseModel: 'male_base',
       gender: 'M',
       age: 26,
       heightCm: 173,
@@ -511,7 +519,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_bordados_veracruz_0',
       displayName: 'Operador Bordados #1',
       roleTag: 'Bordados Veracruz',
-      baseModel: 'male_casual',
+      baseModel: 'male_base',
       gender: 'M',
       age: 32,
       heightCm: 174,
@@ -542,7 +550,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_taller_costura_0',
       displayName: 'Costurera Maestra #1',
       roleTag: 'Taller Imperia Costura',
-      baseModel: 'female_casual',
+      baseModel: 'female_base',
       gender: 'F',
       age: 39,
       heightCm: 160,
@@ -573,7 +581,7 @@ export function createDefaultSims2Profiles() {
       id: 'emp_taller_publi_imperia_0',
       displayName: 'Operador / Prensa Publi #1',
       roleTag: 'Publi-Impresos',
-      baseModel: 'male_casual',
+      baseModel: 'male_base',
       gender: 'M',
       age: 27,
       heightCm: 175,
@@ -1315,7 +1323,7 @@ export function preloadSims2Assets() {
       let hairMesh = null;
 
       scene.traverse((obj) => {
-        if (obj.isBone && obj.name === 'Head') headBone = obj;
+        if (obj.isBone && (obj.name === 'Head' || obj.name === 'head')) headBone = obj;
         if (obj.isSkinnedMesh) {
           obj.castShadow = true;
           obj.receiveShadow = true;
@@ -1466,6 +1474,110 @@ export function syncSims2Garments3D(actorGroup, profile) {
   if (bones.RightUpLeg) {
     const oldRightP = bones.RightUpLeg.getObjectByName('sims2_leg_pocket_right');
     if (oldRightP) bones.RightUpLeg.remove(oldRightP);
+  }
+
+  const isModularBase = ['male_base', 'female_base', 'child_base'].includes(profile.baseModel);
+  if (isModularBase) {
+    const rigRoot = actorGroup.userData.rigRoot;
+    if (!rigRoot) return;
+
+    let bodySkeleton = null;
+    rigRoot.traverse((m) => {
+      if (m.isSkinnedMesh && !m.userData.isGarment) {
+        bodySkeleton = m.skeleton;
+      }
+    });
+
+    if (!bodySkeleton) return;
+
+    // 1. Prenda Superior (Top)
+    const topKey = profile.topStyle === 'filipina' ? 'top_scrub' :
+                   (profile.topStyle === 'bata' || (profile.roleTag && profile.roleTag.includes('Doctor'))) ? 'top_labcoat' :
+                   'top_polo';
+
+    let currentTop = rigRoot.getObjectByName('modular_top_garment');
+    if (currentTop && currentTop.userData.garmentKey !== topKey) {
+      rigRoot.remove(currentTop);
+      currentTop = null;
+    }
+
+    if (!currentTop && assetCache.models[topKey]) {
+      const topEntry = assetCache.models[topKey];
+      topEntry.scene.traverse((child) => {
+        if (child.isSkinnedMesh && !currentTop) {
+          currentTop = child.clone();
+          currentTop.name = 'modular_top_garment';
+          currentTop.userData.isGarment = true;
+          currentTop.userData.garmentKey = topKey;
+          currentTop.material = child.material.clone();
+          currentTop.bind(bodySkeleton, currentTop.bindMatrix);
+          rigRoot.add(currentTop);
+        }
+      });
+    }
+
+    if (currentTop && currentTop.material) {
+      currentTop.material.color.set(profile.topColor || (topKey === 'top_scrub' ? '#0d9488' : '#1e3a8a'));
+      currentTop.material.roughness = profile.topFabric === 'seda' ? 0.35 : 0.8;
+      currentTop.material.needsUpdate = true;
+    }
+
+    // 2. Prenda Inferior (Bottom)
+    const bottomKey = profile.bottomStyle === 'bermuda' ? 'bottom_bermuda' :
+                      (profile.bottomStyle === 'pantalon_vestir' || (profile.roleTag && profile.roleTag.includes('Doctor'))) ? 'bottom_scrub_pants' :
+                      'bottom_jeans';
+
+    let currentBottom = rigRoot.getObjectByName('modular_bottom_garment');
+    if (currentBottom && currentBottom.userData.garmentKey !== bottomKey) {
+      rigRoot.remove(currentBottom);
+      currentBottom = null;
+    }
+
+    if (!currentBottom && assetCache.models[bottomKey]) {
+      const bEntry = assetCache.models[bottomKey];
+      bEntry.scene.traverse((child) => {
+        if (child.isSkinnedMesh && !currentBottom) {
+          currentBottom = child.clone();
+          currentBottom.name = 'modular_bottom_garment';
+          currentBottom.userData.isGarment = true;
+          currentBottom.userData.garmentKey = bottomKey;
+          currentBottom.material = child.material.clone();
+          currentBottom.bind(bodySkeleton, currentBottom.bindMatrix);
+          rigRoot.add(currentBottom);
+        }
+      });
+    }
+
+    if (currentBottom && currentBottom.material) {
+      currentBottom.material.color.set(profile.bottomColor || (bottomKey === 'bottom_scrub_pants' ? '#0d9488' : '#1e293b'));
+      currentBottom.material.roughness = profile.bottomFabric === 'seda' ? 0.35 : 0.8;
+      currentBottom.material.needsUpdate = true;
+    }
+
+    // 3. Calzado (Shoes)
+    const shoeKey = 'shoes_sneakers';
+    let currentShoes = rigRoot.getObjectByName('modular_shoes_garment');
+    if (!currentShoes && assetCache.models[shoeKey]) {
+      const sEntry = assetCache.models[shoeKey];
+      sEntry.scene.traverse((child) => {
+        if (child.isSkinnedMesh && !currentShoes) {
+          currentShoes = child.clone();
+          currentShoes.name = 'modular_shoes_garment';
+          currentShoes.userData.isGarment = true;
+          currentShoes.userData.garmentKey = shoeKey;
+          currentShoes.material = child.material.clone();
+          currentShoes.bind(bodySkeleton, currentShoes.bindMatrix);
+          rigRoot.add(currentShoes);
+        }
+      });
+    }
+
+    if (currentShoes && currentShoes.material) {
+      currentShoes.material.color.set(profile.shoeColor || '#f8fafc');
+      currentShoes.material.needsUpdate = true;
+    }
+
+    return;
   }
 
   const isMedicalBase = ['doctor_male', 'doctor_female', 'nurse_male', 'nurse_female'].includes(profile.baseModel);
@@ -1978,7 +2090,46 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
     mouthLowerDownRight: Math.max(0, fs.lowerLipThickness * 0.5),
     jawForward: THREE.MathUtils.clamp(fs.chinLength * 0.35, 0, 0.7),
     cheekSquintLeft: Math.max(0, fs.cheekboneWidth * 0.45),
-    cheekSquintRight: Math.max(0, fs.cheekboneWidth * 0.45)
+    cheekSquintRight: Math.max(0, fs.cheekboneWidth * 0.45),
+
+    // Shape Keys Nativas MakeHuman MPFB2 (Cuerpo base y Ropa modular):
+    bust_volume_up: (profile.gender === 'F' && (!profile.age || profile.age > 12)) ? Math.max(0, cupFactor - 0.35) * BODY_MOD_FACTOR : 0,
+    bust_volume_down: (profile.gender === 'F' && (!profile.age || profile.age > 12)) ? Math.max(0, -(cupFactor - 0.35)) * BODY_MOD_FACTOR : 0,
+    bust_firmness_up: (profile.gender === 'F' && (!profile.age || profile.age > 12) && (bustShape === 'esfera' || bustShape === 'pico')) ? 0.8 * BODY_MOD_FACTOR : 0,
+    bust_firmness_down: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'pera') ? 0.8 * BODY_MOD_FACTOR : 0,
+    bust_distance_up: 0,
+    bust_distance_down: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'esfera') ? 0.5 * BODY_MOD_FACTOR : 0,
+    bust_height_up: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'esfera') ? 0.4 * BODY_MOD_FACTOR : 0,
+    bust_height_down: (profile.gender === 'F' && (!profile.age || profile.age > 12) && bustShape === 'pera') ? 0.4 * BODY_MOD_FACTOR : 0,
+
+    waist_cinch: Math.max(0, -morphWaist) * BODY_MOD_FACTOR,
+    waist_expand: Math.max(0, morphWaist) * BODY_MOD_FACTOR,
+    hip_width_up: Math.max(0, morphHips) * BODY_MOD_FACTOR,
+    hip_width_down: Math.max(0, -morphHips) * BODY_MOD_FACTOR,
+    hip_depth_up: Math.max(0, morphHips * 0.7) * BODY_MOD_FACTOR,
+    glute_volume_up: (gluteShape === 'bubblebutt' ? 1.0 : gluteShape === 'corazon' ? 0.75 : Math.max(0.2, morphHips)) * BODY_MOD_FACTOR,
+    glute_volume_down: (morphHips < -0.2 ? Math.min(1.0, -morphHips) : 0) * BODY_MOD_FACTOR,
+
+    stomach_tone: rawFit * BODY_MOD_FACTOR,
+    stomach_fullness: rawFat * BODY_MOD_FACTOR,
+
+    chest_pectoral: (profile.gender === 'M' && (!profile.age || profile.age > 12)) ? rawFit * BODY_MOD_FACTOR : 0,
+    v_taper: (profile.gender === 'M' && (!profile.age || profile.age > 12)) ? (rawFit * 0.85) * BODY_MOD_FACTOR : 0,
+    back_dorsi: (profile.gender === 'M' && (!profile.age || profile.age > 12)) ? (rawFit * 0.70) * BODY_MOD_FACTOR : 0,
+
+    upperarm_muscle: THREE.MathUtils.clamp(profile.biceps ?? (rawFit * 0.5), 0, 1.3) * BODY_MOD_FACTOR,
+    lowerarm_muscle: THREE.MathUtils.clamp(profile.forearms ?? (rawFit * 0.4), 0, 1.3) * BODY_MOD_FACTOR,
+    upperleg_muscle: THREE.MathUtils.clamp(profile.quads ?? (rawFit * 0.5), 0, 1.4) * BODY_MOD_FACTOR,
+    lowerleg_muscle: THREE.MathUtils.clamp(profile.calves ?? (rawFit * 0.4), 0, 1.3) * BODY_MOD_FACTOR,
+
+    nose_concave: Math.max(0, -(fs.noseBridgeCurve || 0)),
+    nose_convex: Math.max(0, (fs.noseBridgeCurve || 0)),
+    nose_flaring: Math.max(0, (fs.nostrilFlare || 0)),
+    mouth_cupid: Math.max(0, (fs.upperLipThickness || 0)),
+    lips_full: Math.max(0, (fs.lowerLipThickness || 0)),
+    cheek_volume: Math.max(0, (fs.cheekboneWidth || 0)),
+    chin_prominent: Math.max(0, (fs.chinLength || 0)),
+    chin_width: Math.max(0, (fs.jawWidth || 0))
   };
 
   if (profile.age && profile.age < 14) {
@@ -1988,14 +2139,32 @@ export function applySims2ProfileToGroup(actorGroup, profile) {
     morphValues.sims2_bust_pico = 0;
     morphValues.sims2_bust_esfera = 0;
     morphValues.sims2_bust_semi_esfera = 0;
+    morphValues.bust_volume_up = 0;
+    morphValues.bust_volume_down = 0;
+    morphValues.bust_firmness_up = 0;
+    morphValues.bust_firmness_down = 0;
+    morphValues.bust_distance_up = 0;
+    morphValues.bust_distance_down = 0;
+    morphValues.bust_height_up = 0;
+    morphValues.bust_height_down = 0;
     morphValues.sims2_glutes_volume = 0;
     morphValues.sims2_glutes_bubblebutt = 0;
     morphValues.sims2_glutes_corazon = 0;
     morphValues.sims2_glutes_gota = 0;
     morphValues.sims2_glutes_fat = 0;
     morphValues.sims2_glutes_muscle = 0;
+    morphValues.glute_volume_up = 0;
+    morphValues.glute_volume_down = 0;
     morphValues.sims2_waist = 0;
     morphValues.sims2_hips = 0;
+    morphValues.waist_cinch = 0;
+    morphValues.waist_expand = 0;
+    morphValues.hip_width_up = 0;
+    morphValues.hip_width_down = 0;
+    morphValues.hip_depth_up = 0;
+    morphValues.chest_pectoral = 0;
+    morphValues.v_taper = 0;
+    morphValues.back_dorsi = 0;
   }
 
   rigRoot.traverse((obj) => {
@@ -2142,6 +2311,23 @@ function hydrateActorWithGLB(actorGroup, profile) {
       }
     }
   });
+
+  // Aliases para esqueletos MakeHuman / GameEngine (53 huesos) hacia convención Sims 2
+  if (bones.pelvis && !bones.Hips) bones.Hips = bones.pelvis;
+  if (bones.spine_01 && !bones.Spine) bones.Spine = bones.spine_01;
+  if (bones.spine_03 && !bones.Spine2) bones.Spine2 = bones.spine_03;
+  else if (bones.spine_02 && !bones.Spine2) bones.Spine2 = bones.spine_02;
+  if (bones.head && !bones.Head) bones.Head = bones.head;
+  if (bones.upperarm_l && !bones.LeftArm) bones.LeftArm = bones.upperarm_l;
+  if (bones.lowerarm_l && !bones.LeftForeArm) bones.LeftForeArm = bones.lowerarm_l;
+  if (bones.hand_l && !bones.LeftHand) bones.LeftHand = bones.hand_l;
+  if (bones.upperarm_r && !bones.RightArm) bones.RightArm = bones.upperarm_r;
+  if (bones.lowerarm_r && !bones.RightForeArm) bones.RightForeArm = bones.lowerarm_r;
+  if (bones.hand_r && !bones.RightHand) bones.RightHand = bones.hand_r;
+  if (bones.thigh_l && !bones.LeftUpLeg) bones.LeftUpLeg = bones.thigh_l;
+  if (bones.calf_l && !bones.LeftLeg) bones.LeftLeg = bones.calf_l;
+  if (bones.thigh_r && !bones.RightUpLeg) bones.RightUpLeg = bones.thigh_r;
+  if (bones.calf_r && !bones.RightLeg) bones.RightLeg = bones.calf_r;
 
   // Anclas para accesorios sostenidos en ambas manos (tazas, crepas, pala/rastrillo, vasos, telas)
   let rightHandSocket = null;
