@@ -445,7 +445,7 @@ export default function GameCanvas3D() {
     scene.add(gridHelper);
 
     // Construir cada uno de los 6 Locales Comerciales + Oficina Consorcio y sus máquinas/insumos 3D
-    const wallsList = [];
+    const perimeterWallsList = [];
     Object.keys(ALL_ZONES_3D).forEach((negId) => {
       const zone = ALL_ZONES_3D[negId];
       const [cx, , cz] = zone.center;
@@ -476,36 +476,72 @@ export default function GameCanvas3D() {
       sidewalk.receiveShadow = true;
       localGroup.add(sidewalk);
 
-      // MUROS PERIMETRALES (WALL)
-      const wallMat = new THREE.MeshStandardMaterial({
-        color: zone.muroColorHex,
-        roughness: 0.5,
-        transparent: true,
-        opacity: 0.92
-      });
-      // Muro trasero
-      const backWall = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.22), wallMat);
+      // MUROS PERIMETRALES (WALL) CON CORTE ARQUITECTÓNICO DINÁMICO
+      const createPerimeterWallMesh = (geom, normal, sideName) => {
+        const mat = new THREE.MeshStandardMaterial({
+          color: zone.muroColorHex,
+          roughness: 0.55
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.userData = {
+          isPerimeterWall: true,
+          wallSide: sideName,
+          negocioId: negId,
+          normal,
+          tagType: 'WALL'
+        };
+        perimeterWallsList.push({
+          mesh,
+          negocioId: negId,
+          normal,
+          zoneCenter: new THREE.Vector3(cx, 0, cz)
+        });
+        return mesh;
+      };
+
+      // Muro trasero (normal hacia -Z)
+      const backWall = createPerimeterWallMesh(
+        new THREE.BoxGeometry(w, h, 0.22),
+        new THREE.Vector3(0, 0, -1),
+        'back'
+      );
       backWall.position.set(0, h / 2, -depth / 2);
-      backWall.castShadow = true;
       localGroup.add(backWall);
 
-      // Muros laterales
-      const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.22, h, depth), wallMat);
+      // Muros laterales: Izquierdo (hacia -X) y Derecho (hacia +X)
+      const leftWall = createPerimeterWallMesh(
+        new THREE.BoxGeometry(0.22, h, depth),
+        new THREE.Vector3(-1, 0, 0),
+        'left'
+      );
       leftWall.position.set(-w / 2, h / 2, 0);
-      leftWall.castShadow = true;
       localGroup.add(leftWall);
 
-      const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.22, h, depth), wallMat);
+      const rightWall = createPerimeterWallMesh(
+        new THREE.BoxGeometry(0.22, h, depth),
+        new THREE.Vector3(1, 0, 0),
+        'right'
+      );
       rightWall.position.set(w / 2, h / 2, 0);
-      rightWall.castShadow = true;
       localGroup.add(rightWall);
 
-      // Muro frontal con vano de puerta de entrada (cutaway dinámico)
-      const frontLeft = new THREE.Mesh(new THREE.BoxGeometry(w / 2 - 1.4, h, 0.20), wallMat.clone());
+      // Muros frontales izquierdo y derecho con vano de puerta (normal hacia +Z)
+      const frontLeft = createPerimeterWallMesh(
+        new THREE.BoxGeometry(w / 2 - 1.4, h, 0.20),
+        new THREE.Vector3(0, 0, 1),
+        'front'
+      );
       frontLeft.position.set(-(w / 4 + 0.7), h / 2, depth / 2);
-      const frontRight = new THREE.Mesh(new THREE.BoxGeometry(w / 2 - 1.4, h, 0.20), wallMat.clone());
+
+      const frontRight = createPerimeterWallMesh(
+        new THREE.BoxGeometry(w / 2 - 1.4, h, 0.20),
+        new THREE.Vector3(0, 0, 1),
+        'front'
+      );
       frontRight.position.set(w / 4 + 0.7, h / 2, depth / 2);
-      wallsList.push(frontLeft, frontRight);
+
       localGroup.add(frontLeft, frontRight);
 
       // Borde luminoso superior identificando el color del negocio
@@ -805,11 +841,6 @@ export default function GameCanvas3D() {
       const gameState = useGameStore.getState();
       const trainingState = useTrainingStore.getState();
       const sceneEditorState = useSceneEditorStore.getState();
-
-      // Actualizar opacidad de muros frontales según modo cutaway
-      wallsList.forEach((wMesh) => {
-        wMesh.material.opacity = sceneEditorState.cutawayWalls ? 0.14 : 0.90;
-      });
 
       if (trainingState.isTrainingMode) {
         try {
@@ -1219,6 +1250,9 @@ export default function GameCanvas3D() {
           group.visible = true;
           group.traverse((obj) => {
             if (obj.isMesh && obj.material) {
+              // Los muros perimetrales se gestionan con el algoritmo de corte arquitectónico dinámico
+              if (obj.userData.isPerimeterWall) return;
+
               const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
               mats.forEach((m) => {
                 if (m.userData.baseOpacity === undefined) {
@@ -1296,6 +1330,77 @@ export default function GameCanvas3D() {
             }
           }
         });
+      });
+
+      // Actualizar dinámicamente el Corte Arquitectónico de Muros Perimetrales (Frontal, Trasero y Laterales)
+      const isCutawayActive = Boolean(sceneEditorState.cutawayWalls);
+      const tmpCamDir = new THREE.Vector3();
+
+      perimeterWallsList.forEach((entry) => {
+        const { mesh, negocioId, normal, zoneCenter } = entry;
+        const alpha = businessAlphasRef.current[negocioId] ?? 1.0;
+
+        if (alpha <= 0.001) {
+          mesh.visible = false;
+          return;
+        }
+        mesh.visible = true;
+
+        if (!isCutawayActive) {
+          // CORTE ARQUITECTÓNICO APAGADO:
+          // Todos los muros son completamente sólidos y opacos (sin transparencia)
+          if (alpha >= 0.999) {
+            if (mesh.material.transparent) {
+              mesh.material.transparent = false;
+              mesh.material.needsUpdate = true;
+            }
+            mesh.material.opacity = 1.0;
+            mesh.material.depthWrite = true;
+          } else {
+            if (!mesh.material.transparent) {
+              mesh.material.transparent = true;
+              mesh.material.needsUpdate = true;
+            }
+            mesh.material.opacity = alpha;
+            mesh.material.depthWrite = false;
+          }
+        } else {
+          // CORTE ARQUITECTÓNICO ACTIVADO:
+          // Evaluar si el muro se interpone entre la cámara y el centro del local
+          tmpCamDir.subVectors(camera.position, zoneCenter);
+          // Producto punto en el plano horizontal X-Z
+          const dot = tmpCamDir.x * normal.x + tmpCamDir.z * normal.z;
+
+          // Si dot > 0.15, el muro mira hacia la cámara y obstruye la visual del interior
+          const isFacingCamera = dot > 0.15;
+
+          if (isFacingCamera) {
+            // Muro interpuesto: aplicar corte arquitectónico (semi-transparente estilo Sims/Tycoon)
+            if (!mesh.material.transparent) {
+              mesh.material.transparent = true;
+              mesh.material.needsUpdate = true;
+            }
+            mesh.material.opacity = 0.14 * alpha;
+            mesh.material.depthWrite = false;
+          } else {
+            // Muro de fondo o lateral opuesto: completamente sólido como telón de fondo
+            if (alpha >= 0.999) {
+              if (mesh.material.transparent) {
+                mesh.material.transparent = false;
+                mesh.material.needsUpdate = true;
+              }
+              mesh.material.opacity = 1.0;
+              mesh.material.depthWrite = true;
+            } else {
+              if (!mesh.material.transparent) {
+                mesh.material.transparent = true;
+                mesh.material.needsUpdate = true;
+              }
+              mesh.material.opacity = alpha;
+              mesh.material.depthWrite = false;
+            }
+          }
+        }
       });
 
       // Ocultar / transparentar Pared de Medidores CFE si no estamos en vista global o inspección CFE u Oficinas

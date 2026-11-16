@@ -56,6 +56,8 @@ export default function TopTimeBar({ onOpenAudioModal }) {
   const setImporterModalOpen = useSceneEditorStore((s) => s.setImporterModalOpen);
   const setCollisionToolOpen = useSceneEditorStore((s) => s.setCollisionToolOpen);
   const isCollisionToolOpen = useSceneEditorStore((s) => s.isCollisionToolOpen);
+  const cutawayWalls = useSceneEditorStore((s) => s.cutawayWalls);
+  const toggleCutawayWalls = useSceneEditorStore((s) => s.toggleCutawayWalls);
 
   const [isVistaArcOpen, setIsVistaArcOpen] = useState(false);
   const [lastSingleNegocio, setLastSingleNegocio] = useState('hawaiian_paradise');
@@ -461,6 +463,20 @@ export default function TopTimeBar({ onOpenAudioModal }) {
           >
             <ShieldAlert className="w-3.5 h-3.5" />
             <span>Pisos, Muros y Colisiones</span>
+          </button>
+
+          <button
+            data-testid="toggle-cutaway-walls-quick-btn"
+            onClick={toggleCutawayWalls}
+            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg border text-[11px] font-semibold transition ${
+              cutawayWalls
+                ? 'bg-sky-950/80 hover:bg-sky-900 border-sky-400/80 text-sky-200 shadow'
+                : 'bg-slate-900 hover:bg-slate-800 border-slate-700 text-slate-400'
+            }`}
+            title="Corte Arquitectónico de Muros (Activar visualización interior estilo Sims vs Muros cerrados sólidos)"
+          >
+            <Eye className={`w-3.5 h-3.5 ${cutawayWalls ? 'text-sky-400' : 'text-slate-400'}`} />
+            <span>Muros: {cutawayWalls ? 'Corte ABIERTO' : 'CERRADO (Sólido)'}</span>
           </button>
         </div>
       </div>
