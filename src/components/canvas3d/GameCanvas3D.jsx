@@ -34,6 +34,7 @@ import {
   syncSims2ActorProfile,
   animateSims2Actor
 } from './Sims2AvatarLoader.js';
+import { createWallClock3D, updateWallClockHands } from './WallClock3D.js';
 
 const APPLIANCE_SHORT_NAMES = {
   hp_raspadora: 'Raspadora Hielo',
@@ -338,6 +339,7 @@ export default function GameCanvas3D() {
   const businessGroupsRef = useRef({});
   const businessAlphasRef = useRef({});
   const meterDiscsRef = useRef({});
+  const wallClocksRef = useRef([]);
   const collisionGroupRef = useRef(null);
   const navMeshGroupRef = useRef(null);
   const customModelsGroupRef = useRef(null);
@@ -446,6 +448,7 @@ export default function GameCanvas3D() {
 
     // Construir cada uno de los 6 Locales Comerciales + Oficina Consorcio y sus máquinas/insumos 3D
     const perimeterWallsList = [];
+    wallClocksRef.current = [];
     Object.keys(ALL_ZONES_3D).forEach((negId) => {
       const zone = ALL_ZONES_3D[negId];
       const [cx, , cz] = zone.center;
@@ -709,6 +712,13 @@ export default function GameCanvas3D() {
           spawnMachine('oc_tv_32', [wps.eq_oc_tv_32[0], 0, wps.eq_oc_tv_32[2] - 0.35]);
         }
       }
+
+      // Reloj circular de pared 3D (30cm de diámetro, carcasa negra, dial blanco, manecilla minutero negra y horaria roja)
+      // Montado en la pared del fondo de cada local
+      const wallClock = createWallClock3D(negId);
+      wallClock.clockGroup.position.set(1.8, 2.40, -depth / 2 + 0.1275);
+      localGroup.add(wallClock.clockGroup);
+      wallClocksRef.current.push(wallClock);
     });
 
     // PARED DE MEDIDORES DE LUZ CFE 3D (Muro de Acometida en X = -23, Z = 1)
@@ -860,6 +870,14 @@ export default function GameCanvas3D() {
       const freshTrain = useTrainingStore.getState();
 
       const nowSec = now * 0.001;
+
+      // Actualizar en tiempo real las manecillas de los relojes 3D de pared de cada local
+      if (wallClocksRef.current && wallClocksRef.current.length > 0) {
+        const curSimTime = freshGame.simTimeMs || Date.now();
+        for (let cIdx = 0; cIdx < wallClocksRef.current.length; cIdx++) {
+          updateWallClockHands(wallClocksRef.current[cIdx], curSimTime);
+        }
+      }
 
       // Actualizar animaciones 60 FPS de cada equipo procedural según paso activo / Entrenamiento / estado eléctrico
       Object.keys(machineGroupsRef.current).forEach((eqKey) => {
@@ -1844,6 +1862,7 @@ export default function GameCanvas3D() {
       actorGroupsRef.current = { employees: {}, customers: {}, gerente: null, familia: {} };
       machineGroupsRef.current = {};
       meterDiscsRef.current = {};
+      wallClocksRef.current = [];
       renderer.dispose();
     };
   }, []);

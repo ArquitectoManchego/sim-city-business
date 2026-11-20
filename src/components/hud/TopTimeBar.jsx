@@ -124,12 +124,12 @@ export default function TopTimeBar({ onOpenAudioModal }) {
           </div>
 
           {/* Reloj Digital y Badges de Condiciones */}
-          <div className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1">
+          <div data-testid="hud-toptimebar-reloj-container" className="flex items-center gap-2 bg-slate-900/90 border border-slate-800 rounded-xl px-3 py-1">
             <Calendar className="w-3.5 h-3.5 text-teal-400" />
             <div className="font-mono text-xs">
-              <span className="font-bold text-white">{fechaFormateada}</span>
+              <span data-testid="hud-toptimebar-fecha-span" className="font-bold text-white">{fechaFormateada}</span>
               <span className="mx-1.5 text-slate-600">|</span>
-              <span className="font-bold text-teal-300">{horaFormateada}</span>
+              <span data-testid="hud-toptimebar-hora-span" className="font-bold text-teal-300">{horaFormateada}</span>
             </div>
             {cond.esQuincena && (
               <span className="px-1.5 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-[10px] font-bold">
